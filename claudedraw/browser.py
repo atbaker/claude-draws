@@ -35,7 +35,8 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
 
         # Navigate to Kid Pix first (Claude needs a real page to work with)
         print("Navigating to Kid Pix...")
-        page.goto('https://kidpix.app/')
+        # page.goto('https://kidpix.app/')
+        page.goto('http://localhost:8000') # TODO: Switch to live server after I deploy my Kid Pix fork
 
         # Wait for page to load
         page.wait_for_load_state('domcontentloaded')
@@ -48,7 +49,7 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
         # wait_for_timeout instead of time.sleep to give Playwright time to update the
         # Context object asynchronously behind the scenes
         # https://playwright.dev/python/docs/library#timesleep-leads-to-outdated-state
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(5000)
 
         # Find the side panel page by looking for the extension URL
         print("Finding side panel page...")
@@ -77,7 +78,16 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
         send_button.click()
 
         print("Prompt submitted successfully!")
-        print("Press Ctrl+C to exit.")
-        page.wait_for_timeout(5 * 60)  # Wait for 5 minutes or until interrupted
 
+        # Wait for Claude to start working (stop button appears)
+        print("Waiting for Claude to start working...")
+        stop_button = side_panel_page.locator('button[data-test-id="stop-button"]')
+        stop_button.wait_for(state="visible", timeout=30000)
+
+        # Wait for Claude to finish (stop button disappears)
+        # Set a long timeout since illustrations can take 5-10 minutes
+        print("Claude is working...")
+        stop_button.wait_for(state="hidden", timeout=10 * 60 * 1000)  # 10 minutes
+
+        print("Claude has completed the task!")
         browser.close()
