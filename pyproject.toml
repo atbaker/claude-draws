@@ -1,0 +1,20 @@
+[project]
+name = "claude-draws"
+version = "0.1.0"
+description = "Crowdsourced illustrations using Claude for Chrome and Kid Pix"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.3.0",
+    "playwright>=1.55.0",
+    "pyautogui>=0.9.54",
+]
+
+[project.scripts]
+claudedraw = "claudedraw.cli:cli"
+
+[tool.setuptools]
+packages = ["claudedraw"]
+
+[tool.uv]
+package = true
