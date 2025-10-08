@@ -11,6 +11,7 @@ os.environ['PW_CHROMIUM_ATTACH_TO_OTHER'] = '1'
 import pyautogui
 from playwright.sync_api import sync_playwright
 
+# TODO: Make this an environment variable - Anthropic would probably prefer to keep it secret
 CLAUDE_EXTENSION_ID = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
 
 
@@ -47,11 +48,10 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
         # wait_for_timeout instead of time.sleep to give Playwright time to update the
         # Context object asynchronously behind the scenes
         # https://playwright.dev/python/docs/library#timesleep-leads-to-outdated-state
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(2000)
 
         # Find the side panel page by looking for the extension URL
         print("Finding side panel page...")
-        import pdb; pdb.set_trace()
         side_panel_page = None
         for p in context.pages:
             if CLAUDE_EXTENSION_ID in p.url:
@@ -78,6 +78,6 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
 
         print("Prompt submitted successfully!")
         print("Press Ctrl+C to exit.")
-        page.wait_for_timeout(60000 * 60)  # Wait for 1 hour or until interrupted
+        page.wait_for_timeout(5 * 60)  # Wait for 5 minutes or until interrupted
 
         browser.close()
