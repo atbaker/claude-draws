@@ -2,6 +2,7 @@
 
 import os
 import time
+from pathlib import Path
 
 # IMPORTANT: Set this environment variable BEFORE importing playwright
 # This enables the underlying Node.js server to attach to Chrome targets of type "other"
@@ -90,4 +91,25 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
         stop_button.wait_for(state="hidden", timeout=10 * 60 * 1000)  # 10 minutes
 
         print("Claude has completed the task!")
+
+        # Save the artwork
+        print("Saving artwork...")
+
+        # Create downloads directory if it doesn't exist
+        downloads_dir = Path("./downloads")
+        downloads_dir.mkdir(exist_ok=True)
+
+        # Set up download handling and click save button
+        with page.expect_download() as download_info:
+            save_button = page.locator('button#save')
+            save_button.click()
+
+        # Wait for download to complete and save it
+        download = download_info.value
+        timestamp = int(time.time())
+        download_path = downloads_dir / f"kidpix-{timestamp}.png"
+        download.save_as(str(download_path))
+
+        print(f"Artwork saved to: {download_path}")
+
         browser.close()
