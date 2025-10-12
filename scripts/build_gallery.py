@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""
+Build script for Claude Draws gallery metadata.
+
+This script manages the gallery-metadata.json file that powers the static gallery site.
+It can operate in two modes:
+
+1. Append mode (--append): Fetches metadata for a single artwork from R2 and appends it
+   to the local gallery-metadata.json file. Fast and efficient for incremental updates.
+
+2. Full rebuild mode (--full): Lists all artwork metadata files in R2, downloads them,
+   and regenerates the entire gallery-metadata.json from scratch. Slower but ensures
+   data integrity.
+
+Usage:
+    # Append a single artwork (fast)
+    ./scripts/build_gallery.py --append kidpix-1710501234
+
+    # Full rebuild from R2 (slower, but recovers from any local corruption)
+    ./scripts/build_gallery.py --full
+
+    # Test upload (for development)
+    ./scripts/build_gallery.py --test-upload /path/to/image.png --title "Test Art" --reddit-url "https://reddit.com/..."
+"""
+
+import argparse
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Optional
+
+import boto3
+from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# R2 Configuration
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
+R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL")
+
+# Validate required environment variables
+REQUIRED_ENV_VARS = [
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_BUCKET_NAME",
+    "R2_PUBLIC_URL",
+]
+
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+if missing_vars:
+    print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
+    print("Please create a .env file with these variables. See .env.example for reference.")
+    sys.exit(1)
+
+# Gallery metadata file path
+GALLERY_METADATA_PATH = Path(__file__).parent.parent / "gallery-metadata.json"
+
+
+def get_r2_client():
+    """Create and return an R2 client using boto3."""
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto",  # R2 uses 'auto' for region
+    )
+
+
+def load_gallery_metadata() -> Dict:
+    """Load existing gallery metadata or create a new structure."""
+    if GALLERY_METADATA_PATH.exists():
+        with open(GALLERY_METADATA_PATH, "r") as f:
+            return json.load(f)
+    else:
+        return {"artworks": [], "lastUpdated": None}
+
+
+def save_gallery_metadata(metadata: Dict):
+    """Save gallery metadata to disk."""
+    metadata["lastUpdated"] = datetime.now(timezone.utc).isoformat()
+    with open(GALLERY_METADATA_PATH, "w") as f:
+        json.dump(metadata, f, indent=2)
+    print(f"✓ Saved gallery metadata to {GALLERY_METADATA_PATH}")
+
+
+def fetch_artwork_metadata(client, artwork_id: str) -> Optional[Dict]:
+    """Fetch metadata for a single artwork from R2."""
+    metadata_key = f"{artwork_id}.json"
+
+    try:
+        response = client.get_object(Bucket=R2_BUCKET_NAME, Key=metadata_key)
+        metadata = json.loads(response["Body"].read())
+        print(f"✓ Fetched metadata for {artwork_id}")
+        return metadata
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            print(f"✗ Metadata file not found: {metadata_key}")
+        else:
+            print(f"✗ Error fetching metadata: {e}")
+        return None
+
+
+def append_artwork(artwork_id: str):
+    """Append a single artwork to gallery metadata (fast mode)."""
+    print(f"Appending artwork: {artwork_id}")
+
+    # Get R2 client
+    client = get_r2_client()
+
+    # Fetch metadata from R2
+    metadata = fetch_artwork_metadata(client, artwork_id)
+    if not metadata:
+        print(f"✗ Cannot append {artwork_id} - metadata not found in R2")
+        sys.exit(1)
+
+    # Ensure required fields are present
+    required_fields = ["id", "title", "redditPostUrl", "createdAt"]
+    missing_fields = [field for field in required_fields if field not in metadata]
+    if missing_fields:
+        print(f"✗ Metadata missing required fields: {', '.join(missing_fields)}")
+        sys.exit(1)
+
+    # Construct full artwork entry with image URL
+    image_url = f"{R2_PUBLIC_URL}/{artwork_id}.png"
+    artwork_entry = {
+        "id": metadata["id"],
+        "imageUrl": image_url,
+        "title": metadata["title"],
+        "redditPostUrl": metadata["redditPostUrl"],
+        "createdAt": metadata["createdAt"],
+        "videoUrl": metadata.get("videoUrl", None),
+    }
+
+    # Load existing gallery metadata
+    gallery_metadata = load_gallery_metadata()
+
+    # Check if artwork already exists
+    existing_ids = {artwork["id"] for artwork in gallery_metadata["artworks"]}
+    if artwork_id in existing_ids:
+        print(f"⚠ Artwork {artwork_id} already exists in gallery metadata, skipping")
+        return
+
+    # Append new artwork
+    gallery_metadata["artworks"].append(artwork_entry)
+
+    # Save updated metadata
+    save_gallery_metadata(gallery_metadata)
+    print(f"✓ Appended {artwork_id} to gallery metadata")
+
+
+def rebuild_full():
+    """Rebuild entire gallery metadata from R2 (slow mode)."""
+    print("Rebuilding gallery metadata from R2...")
+
+    # Get R2 client
+    client = get_r2_client()
+
+    # List all objects in bucket
+    print(f"Listing all objects in bucket: {R2_BUCKET_NAME}")
+    try:
+        response = client.list_objects_v2(Bucket=R2_BUCKET_NAME)
+    except ClientError as e:
+        print(f"✗ Error listing R2 objects: {e}")
+        sys.exit(1)
+
+    if "Contents" not in response:
+        print("⚠ No objects found in R2 bucket")
+        gallery_metadata = {"artworks": [], "lastUpdated": None}
+        save_gallery_metadata(gallery_metadata)
+        return
+
+    # Find all metadata JSON files (exclude image files)
+    metadata_keys = [
+        obj["Key"]
+        for obj in response["Contents"]
+        if obj["Key"].endswith(".json") and obj["Key"].startswith("kidpix-")
+    ]
+
+    print(f"Found {len(metadata_keys)} metadata files")
+
+    # Fetch and parse all metadata files
+    artworks = []
+    for metadata_key in metadata_keys:
+        artwork_id = metadata_key.replace(".json", "")
+
+        try:
+            response = client.get_object(Bucket=R2_BUCKET_NAME, Key=metadata_key)
+            metadata = json.loads(response["Body"].read())
+
+            # Construct full artwork entry
+            image_url = f"{R2_PUBLIC_URL}/{artwork_id}.png"
+            artwork_entry = {
+                "id": metadata["id"],
+                "imageUrl": image_url,
+                "title": metadata["title"],
+                "redditPostUrl": metadata["redditPostUrl"],
+                "createdAt": metadata["createdAt"],
+                "videoUrl": metadata.get("videoUrl", None),
+            }
+
+            artworks.append(artwork_entry)
+            print(f"✓ Loaded {artwork_id}")
+
+        except (ClientError, json.JSONDecodeError, KeyError) as e:
+            print(f"⚠ Error loading {metadata_key}: {e}")
+            continue
+
+    # Sort by creation date (newest first)
+    artworks.sort(key=lambda x: x["createdAt"], reverse=True)
+
+    # Save to disk
+    gallery_metadata = {"artworks": artworks, "lastUpdated": None}
+    save_gallery_metadata(gallery_metadata)
+
+    print(f"✓ Rebuilt gallery metadata with {len(artworks)} artworks")
+
+
+def test_upload(image_path: str, title: str, reddit_url: str):
+    """Upload a test artwork to R2 (for development/testing)."""
+    print(f"Test uploading artwork: {title}")
+
+    # Generate artwork ID
+    artwork_id = f"kidpix-{int(datetime.now(timezone.utc).timestamp())}"
+
+    # Get R2 client
+    client = get_r2_client()
+
+    # Upload image
+    image_path_obj = Path(image_path)
+    if not image_path_obj.exists():
+        print(f"✗ Image file not found: {image_path}")
+        sys.exit(1)
+
+    print(f"Uploading image: {image_path}")
+    try:
+        with open(image_path, "rb") as f:
+            client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=f"{artwork_id}.png",
+                Body=f,
+                ContentType="image/png",
+            )
+        print(f"✓ Uploaded image: {artwork_id}.png")
+    except ClientError as e:
+        print(f"✗ Error uploading image: {e}")
+        sys.exit(1)
+
+    # Create and upload metadata
+    metadata = {
+        "id": artwork_id,
+        "title": title,
+        "redditPostUrl": reddit_url,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "videoUrl": None,
+    }
+
+    print(f"Uploading metadata: {artwork_id}.json")
+    try:
+        client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=f"{artwork_id}.json",
+            Body=json.dumps(metadata, indent=2),
+            ContentType="application/json",
+        )
+        print(f"✓ Uploaded metadata: {artwork_id}.json")
+    except ClientError as e:
+        print(f"✗ Error uploading metadata: {e}")
+        sys.exit(1)
+
+    # Print public URLs
+    image_url = f"{R2_PUBLIC_URL}/{artwork_id}.png"
+    print(f"\n✓ Test upload complete!")
+    print(f"  Artwork ID: {artwork_id}")
+    print(f"  Image URL: {image_url}")
+    print(f"  Metadata URL: {R2_PUBLIC_URL}/{artwork_id}.json")
+
+    return artwork_id
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Build gallery metadata for Claude Draws",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--append",
+        metavar="ARTWORK_ID",
+        help="Append a single artwork to gallery metadata (fast)",
+    )
+    group.add_argument(
+        "--full",
+        action="store_true",
+        help="Rebuild entire gallery metadata from R2 (slow)",
+    )
+    group.add_argument(
+        "--test-upload",
+        metavar="IMAGE_PATH",
+        help="Upload a test artwork to R2 (requires --title and --reddit-url)",
+    )
+
+    parser.add_argument("--title", help="Artwork title (for test upload)")
+    parser.add_argument("--reddit-url", help="Reddit post URL (for test upload)")
+
+    args = parser.parse_args()
+
+    # Handle different modes
+    if args.append:
+        append_artwork(args.append)
+
+    elif args.full:
+        rebuild_full()
+
+    elif args.test_upload:
+        if not args.title or not args.reddit_url:
+            parser.error("--test-upload requires --title and --reddit-url")
+        artwork_id = test_upload(args.test_upload, args.title, args.reddit_url)
+
+        # Ask if user wants to append to gallery metadata
+        response = input("\nAppend to gallery metadata? (y/n): ")
+        if response.lower() == "y":
+            append_artwork(artwork_id)
+
+
+if __name__ == "__main__":
+    main()

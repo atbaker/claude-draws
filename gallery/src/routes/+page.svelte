@@ -1,0 +1,53 @@
+<script lang="ts">
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
+</script>
+
+<svelte:head>
+	<title>Claude Draws - AI-Generated Kid Pix Art</title>
+	<meta
+		name="description"
+		content="Gallery of crowdsourced illustrations created by Claude for Chrome using Kid Pix"
+	/>
+</svelte:head>
+
+<div class="container mx-auto px-4 py-8">
+	<header class="mb-12 text-center">
+		<h1 class="text-4xl font-bold mb-4">Claude Draws</h1>
+		<p class="text-lg text-gray-600">
+			AI-generated Kid Pix art, inspired by Reddit requests
+		</p>
+	</header>
+
+	{#if data.artworks.length === 0}
+		<div class="text-center py-12">
+			<p class="text-xl text-gray-500">No artworks yet. Check back soon!</p>
+		</div>
+	{:else}
+		<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+			{#each data.artworks as artwork}
+				<a
+					href="/artwork/{artwork.id}"
+					class="group block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow"
+				>
+					<div class="aspect-[4/3] bg-gray-100">
+						<img
+							src={artwork.imageUrl}
+							alt={artwork.title}
+							class="w-full h-full object-contain pixelated"
+						/>
+					</div>
+					<div class="p-4">
+						<h2 class="font-bold text-lg mb-2 group-hover:text-blue-600 transition-colors">
+							{artwork.title}
+						</h2>
+						<time class="text-sm text-gray-500">
+							{new Date(artwork.createdAt).toLocaleDateString()}
+						</time>
+					</div>
+				</a>
+			{/each}
+		</div>
+	{/if}
+</div>

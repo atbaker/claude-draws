@@ -5,9 +5,11 @@ description = "Crowdsourced illustrations using Claude for Chrome and Kid Pix"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "boto3>=1.40.50",
     "click>=8.3.0",
     "playwright>=1.55.0",
     "pyautogui>=0.9.54",
+    "python-dotenv>=1.1.1",
 ]
 
 [project.scripts]

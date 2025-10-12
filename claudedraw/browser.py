@@ -43,6 +43,7 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
         page.wait_for_load_state('domcontentloaded')
 
         # Open Claude side panel using OS-level keyboard shortcut (Command+E on Mac)
+        page.wait_for_timeout(1000)
         print("Opening Claude side panel with Command+E...")
         pyautogui.hotkey('command', 'e')
 

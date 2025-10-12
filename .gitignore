@@ -1,5 +1,6 @@
 # Claude Draws
 .chrome-data/
+gallery-metadata.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

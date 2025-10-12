@@ -1,0 +1,13 @@
+name = "claude-draws-gallery"
+compatibility_date = "2025-10-12"
+main = ".svelte-kit/cloudflare/_worker.js"
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+
+# Custom domain configuration
+# After deployment, configure the domain in the Cloudflare dashboard
+# or add route configuration here:
+# routes = [
+#   { pattern = "claudedraws.com", custom_domain = true }
+# ]
