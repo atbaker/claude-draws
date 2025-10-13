@@ -1,0 +1,39 @@
+FROM python:3.13-slim
+
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for Python package management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python dependencies
+COPY pyproject.toml uv.lock ./
+
+# Install Python dependencies
+RUN uv sync --frozen
+
+# Install wrangler globally
+RUN npm install -g wrangler
+
+# Copy application code
+COPY . .
+
+# Install gallery dependencies
+WORKDIR /app/gallery
+RUN npm install
+
+# Back to root
+WORKDIR /app
+
+# Default command (can be overridden in docker-compose)
+CMD ["uv", "run", "python", "-m", "worker.main"]

@@ -1,6 +1,8 @@
 """Browser automation using Playwright."""
 
+import asyncio
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -10,19 +12,36 @@ from pathlib import Path
 os.environ['PW_CHROMIUM_ATTACH_TO_OTHER'] = '1'
 
 import pyautogui
+from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+from temporalio.client import Client
+
+# Add parent directory to path so we can import workflows
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from workflows.process_artwork import ProcessArtworkWorkflow
+
+# Load environment variables
+load_dotenv()
+
+TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
+TASK_QUEUE = "claude-draws-queue"
 
 # TODO: Make this an environment variable - Anthropic would probably prefer to keep it secret
 CLAUDE_EXTENSION_ID = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
 
 
-def submit_claude_prompt(cdp_url: str, prompt: str):
+def submit_claude_prompt(cdp_url: str, prompt: str, reddit_url: str | None) -> str:
     """
     Connect to a Chrome browser via CDP and submit a prompt to Claude for Chrome.
 
     Args:
         cdp_url: Chrome DevTools Protocol endpoint URL
         prompt: The prompt to send to Claude
+        reddit_url: URL of Reddit post that inspired this artwork (optional)
+
+    Returns:
+        Gallery URL where the artwork can be viewed
     """
     with sync_playwright() as p:
         # Connect to the existing browser via CDP
@@ -113,4 +132,35 @@ def submit_claude_prompt(cdp_url: str, prompt: str):
 
         print(f"Artwork saved to: {download_path}")
 
+        # All done, close the browser
         browser.close()
+
+    # Exit Playwright context before running workflow
+    # (Playwright has a running event loop that conflicts with asyncio)
+
+    # Trigger Temporal workflow to process and publish the artwork
+    print("\nProcessing artwork through workflow...")
+
+    async def trigger_workflow():
+        """Trigger the ProcessArtworkWorkflow and return gallery URL."""
+        # Connect to Temporal
+        client = await Client.connect(TEMPORAL_HOST)
+
+        # Execute workflow
+        result = await client.execute_workflow(
+            ProcessArtworkWorkflow.run,
+            args=[
+                str(download_path),
+                "Claude Draws Artwork",  # Placeholder title
+                reddit_url,
+            ],
+            id=f"process-artwork-{timestamp}",
+            task_queue=TASK_QUEUE,
+        )
+
+        return result
+
+    # Run the async workflow and get the gallery URL
+    gallery_url = asyncio.run(trigger_workflow())
+
+    return gallery_url

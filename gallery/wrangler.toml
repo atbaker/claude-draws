@@ -4,6 +4,7 @@ main = ".svelte-kit/cloudflare/_worker.js"
 
 [assets]
 directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
 
 # Custom domain configuration
 # After deployment, configure the domain in the Cloudflare dashboard

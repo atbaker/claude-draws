@@ -44,17 +44,19 @@
 					</time>
 				</div>
 
-				<div>
-					<h2 class="text-sm font-semibold text-gray-500 uppercase mb-1">Inspired By</h2>
-					<a
-						href={artwork.redditPostUrl}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="text-lg text-blue-600 hover:text-blue-800 transition-colors"
-					>
-						View Reddit Post →
-					</a>
-				</div>
+				{#if artwork.redditPostUrl}
+					<div>
+						<h2 class="text-sm font-semibold text-gray-500 uppercase mb-1">Inspired By</h2>
+						<a
+							href={artwork.redditPostUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-lg text-blue-600 hover:text-blue-800 transition-colors"
+						>
+							View Reddit Post →
+						</a>
+					</div>
+				{/if}
 
 				{#if artwork.videoUrl}
 					<div>
@@ -75,8 +77,7 @@
 
 			<div class="mt-8 pt-8 border-t border-gray-200">
 				<p class="text-sm text-gray-600">
-					This artwork was created by Claude for Chrome using Kid Pix, based on a user request
-					from Reddit.
+					This artwork was created by Claude for Chrome using Kid Pix.
 				</p>
 			</div>
 		</div>

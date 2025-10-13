@@ -21,12 +21,20 @@ def cli():
     required=True,
     help='Prompt to send to Claude for Chrome'
 )
-def start(cdp_url: str, prompt: str):
+@click.option(
+    '--reddit-url',
+    required=False,
+    default=None,
+    help='Reddit post URL that inspired this artwork (optional)'
+)
+def start(cdp_url: str, prompt: str, reddit_url: str | None):
     """Connect to a running Chrome browser and submit a prompt to Claude."""
     click.echo(f"Connecting to Chrome at {cdp_url}...")
     click.echo(f"Submitting prompt: {prompt}")
-    submit_claude_prompt(cdp_url, prompt)
-    click.echo("Done!")
+    if reddit_url:
+        click.echo(f"Reddit post: {reddit_url}")
+    gallery_url = submit_claude_prompt(cdp_url, prompt, reddit_url)
+    click.echo(f"\n✓ Done! Artwork available at: {gallery_url}")
 
 
 if __name__ == '__main__':

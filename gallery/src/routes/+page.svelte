@@ -16,7 +16,7 @@
 	<header class="mb-12 text-center">
 		<h1 class="text-4xl font-bold mb-4">Claude Draws</h1>
 		<p class="text-lg text-gray-600">
-			AI-generated Kid Pix art, inspired by Reddit requests
+			AI-generated Kid Pix art created by Claude for Chrome
 		</p>
 	</header>
 
