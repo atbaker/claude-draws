@@ -262,6 +262,12 @@ def submit_claude_prompt(cdp_url: str, prompt: str | None) -> str:
 
         print("Claude has completed the task!")
 
+        # Extract HTML from Claude's final response
+        print("Extracting response metadata...")
+        last_response = side_panel_page.locator('div.claude-response').last
+        response_html = last_response.inner_html()
+        print(f"Extracted {len(response_html)} characters from Claude's response")
+
         # Save the artwork
         print("Saving artwork...")
 
@@ -301,7 +307,7 @@ def submit_claude_prompt(cdp_url: str, prompt: str | None) -> str:
             ProcessArtworkWorkflow.run,
             args=[
                 str(download_path),
-                "Claude Draws Artwork",  # Placeholder title
+                response_html,  # HTML from Claude's final response
                 reddit_post_url,  # Reddit post URL (None for direct mode)
             ],
             id=f"process-artwork-{timestamp}",

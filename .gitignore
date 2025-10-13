@@ -2,6 +2,9 @@
 .chrome-data/
 gallery-metadata.json
 
+# BAML (auto-generated)
+baml_client/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

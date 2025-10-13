@@ -15,6 +15,7 @@ load_dotenv()
 from workflows.activities import (
     append_to_gallery_metadata,
     deploy_to_cloudflare,
+    extract_artwork_metadata,
     rebuild_static_site,
     upload_image_to_r2,
     upload_metadata_to_r2,
@@ -45,6 +46,7 @@ async def main():
         task_queue=TASK_QUEUE,
         workflows=[ProcessArtworkWorkflow],
         activities=[
+            extract_artwork_metadata,
             upload_image_to_r2,
             upload_metadata_to_r2,
             append_to_gallery_metadata,

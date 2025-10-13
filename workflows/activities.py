@@ -5,10 +5,11 @@ import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
+from baml_client.sync_client import b
 from dotenv import load_dotenv
 from temporalio import activity
 
@@ -37,6 +38,34 @@ def get_r2_client():
         aws_secret_access_key=R2_SECRET_ACCESS_KEY,
         region_name="auto",
     )
+
+
+@activity.defn
+async def extract_artwork_metadata(response_html: str) -> Tuple[str, str]:
+    """
+    Extract artwork title and artist statement from Claude's HTML response using BAML.
+
+    Args:
+        response_html: HTML content from Claude for Chrome's final response
+
+    Returns:
+        Tuple of (title, artist_statement)
+    """
+    activity.logger.info("Extracting artwork metadata with BAML...")
+
+    try:
+        # Call BAML function to extract structured metadata
+        metadata = b.ExtractArtworkMetadata(response_html)
+
+        activity.logger.info(f"✓ Extracted title: {metadata.title}")
+        activity.logger.info(f"✓ Extracted artist statement ({len(metadata.artist_statement)} chars)")
+
+        return (metadata.title, metadata.artist_statement)
+
+    except Exception as e:
+        activity.logger.error(f"✗ Error extracting metadata: {e}")
+        # Return fallback values if extraction fails
+        return ("Claude Draws Artwork", "Artwork created with Kid Pix")
 
 
 @activity.defn
@@ -138,6 +167,7 @@ async def append_to_gallery_metadata(artwork_id: str, image_url: str, metadata: 
         "id": metadata["id"],
         "imageUrl": image_url,
         "title": metadata["title"],
+        "artistStatement": metadata.get("artistStatement", ""),
         "redditPostUrl": metadata["redditPostUrl"],
         "createdAt": metadata["createdAt"],
         "videoUrl": metadata.get("videoUrl", None),

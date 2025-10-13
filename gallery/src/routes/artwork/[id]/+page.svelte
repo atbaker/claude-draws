@@ -33,6 +33,12 @@
 		<div class="p-8">
 			<h1 class="text-3xl font-bold mb-4">{artwork.title}</h1>
 
+			{#if artwork.artistStatement}
+				<div class="mb-6 text-gray-700 text-lg whitespace-pre-wrap leading-relaxed">
+					{artwork.artistStatement}
+				</div>
+			{/if}
+
 			<div class="space-y-4 text-gray-700">
 				<div>
 					<h2 class="text-sm font-semibold text-gray-500 uppercase mb-1">Created</h2>
