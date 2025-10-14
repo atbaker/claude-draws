@@ -10,7 +10,7 @@ from pathlib import Path
 # (such as extension side panels) as if they were regular pages
 os.environ['PW_CHROMIUM_ATTACH_TO_OTHER'] = '1'
 
-import praw
+import asyncpraw
 import pyautogui
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
@@ -39,9 +39,9 @@ REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "claude-draws:v0.1.0")
 SUBREDDIT_NAME = "ClaudeDraws"
 
 
-def get_image_urls_from_post(post):
+async def get_image_urls_from_post(post):
     """
-    Extract image URLs from a Reddit submission using PRAW.
+    Extract image URLs from a Reddit submission using Async PRAW.
 
     Returns:
         list: List of image URLs found in the post
@@ -161,75 +161,76 @@ async def post_reddit_comment(page, reddit_post_url: str, post_id: str, artwork_
     comment_id = await comment_element.get_attribute('thingid')
     print(f"Found comment ID: {comment_id}")
 
-    # Use PRAW to approve the comment
-    print("Approving comment via PRAW...")
-    reddit = praw.Reddit(
+    # Use Async PRAW to approve the comment
+    print("Approving comment via Async PRAW...")
+    async with asyncpraw.Reddit(
         client_id=REDDIT_CLIENT_ID,
         client_secret=REDDIT_CLIENT_SECRET,
         username=REDDIT_USERNAME,
         password=REDDIT_PASSWORD,
         user_agent=REDDIT_USER_AGENT,
-    )
-    comment = reddit.comment(id=comment_id.replace('t1_', ''))  # Remove the 't1_' prefix
-    comment.mod.approve()
-    print("✓ Comment approved!")
+    ) as reddit:
+        comment = await reddit.comment(id=comment_id.replace('t1_', ''))  # Remove the 't1_' prefix
+        await comment.mod.approve()
+        print("✓ Comment approved!")
 
-    # Sticky the comment so it appears at the top
-    print("Stickying comment...")
-    comment.mod.distinguish(sticky=True)
-    print("✓ Comment stickied!")
+        # Sticky the comment so it appears at the top
+        print("Stickying comment...")
+        await comment.mod.distinguish(how="yes", sticky=True)
+        print("✓ Comment stickied!")
 
-    # Update post flair to "Completed" via PRAW
+    # Update post flair to "Completed" via Async PRAW
     print("\nUpdating post flair to 'Completed'...")
-    reddit = praw.Reddit(
+    async with asyncpraw.Reddit(
         client_id=REDDIT_CLIENT_ID,
         client_secret=REDDIT_CLIENT_SECRET,
         username=REDDIT_USERNAME,
         password=REDDIT_PASSWORD,
         user_agent=REDDIT_USER_AGENT,
-    )
-    submission = reddit.submission(id=post_id)
+    ) as reddit:
+        submission = await reddit.submission(id=post_id)
 
-    # Find the "Completed" flair template
-    choices = submission.flair.choices()
-    completed_template = next(
-        (choice for choice in choices if choice.get('flair_text') == 'Completed'),
-        None
-    )
+        # Find the "Completed" flair template
+        choices = await submission.flair.choices()
+        completed_template = next(
+            (choice for choice in choices if choice.get('flair_text') == 'Completed'),
+            None
+        )
 
-    if completed_template:
-        submission.flair.select(completed_template['flair_template_id'])
-        print("✓ Post flair updated to 'Completed'!")
+        if completed_template:
+            await submission.flair.select(completed_template['flair_template_id'])
+            print("✓ Post flair updated to 'Completed'!")
 
-        # Refresh the page so viewers can see the updated flair
-        print("Refreshing page to show updated flair...")
-        await page.reload()
-        await page.wait_for_load_state('domcontentloaded')
-        await page.wait_for_timeout(2000)  # Give viewers time to see it
-        print("✓ Page refreshed!")
-    else:
-        print("⚠ Warning: 'Completed' flair template not found")
+            # Refresh the page so viewers can see the updated flair
+            print("Refreshing page to show updated flair...")
+            await page.reload()
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(2000)  # Give viewers time to see it
+            print("✓ Page refreshed!")
+        else:
+            print("⚠ Warning: 'Completed' flair template not found")
 
 
-def format_reddit_post_prompt(post) -> str:
+async def format_reddit_post_prompt(post) -> str:
     """
     Format a Reddit post's data into a prompt for Claude.
 
     Loads the static template from reddit_prompt.md and prepends post details.
 
     Args:
-        post: PRAW Submission object
+        post: Async PRAW Submission object
 
     Returns:
         str: Formatted prompt with post details first, then template
     """
-    author = post.author.name if post.author else "[deleted]"
+    author = post.author
+    author_name = author.name if author else "[deleted]"
 
     # Build post details section (this will be visible in chat history)
     post_details = [
-        "# Post Details:\n",
-        f"**From:** u/{author}",
-        f"**Title:** {post.title}",
+        "# Post Details:",
+        f"\n**From:** u/{author_name}",
+        f"\n**Title:** {post.title}",
     ]
 
     # Add post body if it exists
@@ -237,7 +238,7 @@ def format_reddit_post_prompt(post) -> str:
         post_details.append(f"\n**Request:**\n{post.selftext}")
 
     # Add image URLs if present
-    image_urls = get_image_urls_from_post(post)
+    image_urls = await get_image_urls_from_post(post)
     if image_urls:
         post_details.append(f"\n**Reference Images ({len(image_urls)}):**")
         for i, url in enumerate(image_urls, 1):
@@ -329,20 +330,22 @@ async def submit_claude_prompt(cdp_url: str, prompt: str | None) -> str:
             print(f"Extracted post ID: {post_id}")
             reddit_post_url = current_url
 
-            # Fetch post data with PRAW
-            print("Fetching post details with PRAW...")
-            reddit = praw.Reddit(
+            # Fetch post data with Async PRAW
+            print("Fetching post details with Async PRAW...")
+            async with asyncpraw.Reddit(
                 client_id=REDDIT_CLIENT_ID,
                 client_secret=REDDIT_CLIENT_SECRET,
                 username=REDDIT_USERNAME,
                 password=REDDIT_PASSWORD,
                 user_agent=REDDIT_USER_AGENT,
-            )
-            post = reddit.submission(id=post_id)
+            ) as reddit:
+                post = await reddit.submission(id=post_id)
 
-            # Format the prompt with post details
-            prompt = format_reddit_post_prompt(post)
-            print(f"Request from u/{post.author.name if post.author else '[deleted]'}: {post.title}")
+                # Format the prompt with post details
+                prompt = await format_reddit_post_prompt(post)
+                author = post.author
+                author_name = author.name if author else '[deleted]'
+                print(f"Request from u/{author_name}: {post.title}")
 
             # Navigate to Kid Pix
             print("Navigating to Kid Pix...")
