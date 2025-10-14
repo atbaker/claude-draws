@@ -15,3 +15,4 @@ You are currently on the Kid Pix interface at `http://localhost:8000`. A Reddit 
 6. Be creative and have fun! Kid Pix is a nostalgic drawing program with unique tools and effects
 
 **DO NOT** work on your artwork for longer than five minutes. When the timer on the web page says "No time remaining" you should wrap up.
+**DO NOT** write an artist statement longer than 3 sentences

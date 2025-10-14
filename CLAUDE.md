@@ -4,10 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Claude Draws** is a livestream art project where Claude for Chrome creates crowdsourced illustrations using a JavaScript port of Kid Pix. The project consists of:
+**Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from Reddit requests. The complete workflow:
 
-1. **Python CLI tool** (`claudedraw/`) - Automates submitting prompts to Claude for Chrome extension via browser automation
-2. **Modified Kid Pix** (`kidpix/`) - Customized version of the open-source Kid Pix JavaScript app for Claude's use
+1. **Python CLI** (`claudedraw/`) monitors r/ClaudeDraws for art requests
+2. **Browser automation** (Playwright + CDP) submits prompts to Claude for Chrome extension
+3. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
+4. **Temporal workflows** orchestrate the post-processing pipeline
+5. **BAML extraction** parses Claude's title and artist statement from the final response
+6. **Cloudflare R2** stores artwork images and metadata
+7. **SvelteKit gallery** (`gallery/`) displays all artworks at claudedraws.com
+8. **Cloudflare Workers** hosts the static gallery site
+
+### Key Components
+
+1. **Python CLI tool** (`claudedraw/`) - Browser automation to submit prompts to Claude for Chrome
+2. **Temporal workflows** (`workflows/`) - Orchestrates artwork processing, metadata extraction, R2 upload, gallery rebuild, and deployment
+3. **Temporal worker** (`worker/`) - Runs the Temporal worker process that executes workflow activities
+4. **SvelteKit gallery** (`gallery/`) - Static site deployed to Cloudflare Workers
+5. **BAML integration** (`baml_src/`) - AI-powered extraction of artwork titles and artist statements
 
 ## Key Architecture Details
 
@@ -27,63 +41,172 @@ The core automation flow in `claudedraw/browser.py`:
    - After opening side panel with Command+E, must use `page.wait_for_timeout()` (not `time.sleep()`) to allow Playwright's context to update
    - Then iterate through `context.pages` to find the page with the Claude for Chrome extension ID in its URL
 
-### Kid Pix Customizations
+### Temporal Workflow Architecture
 
-Located in `kidpix/` directory. This is a fork of the open-source Kid Pix JavaScript implementation.
+**Workflow**: `workflows/process_artwork.py` - `ProcessArtworkWorkflow`
 
-**Build process**: Run `./build.sh` to concatenate all JS files from `js/` subdirectories into `js/app.js`
+After Claude finishes creating an artwork, the CLI triggers a Temporal workflow that:
 
-**Key modifications made**:
-- Removed default splash screen image (`js/util/display.js` line ~146)
-- Disabled localStorage loading to ensure blank canvas on every load (for fresh commissions)
-- Updated social links in `index.html` to point to this project
+1. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
+2. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket
+3. **Uploads metadata to R2** - Stores JSON metadata file alongside image
+4. **Appends to gallery metadata** - Updates local `gallery/src/lib/gallery-metadata.json` (gitignored)
+5. **Rebuilds static site** - Runs `npm run build` in gallery directory
+6. **Deploys to Cloudflare Workers** - Runs `wrangler deploy` to push updates live
+7. **Returns gallery URL** - Provides public artwork URL for posting back to Reddit
 
-**JavaScript structure**:
-- `js/init/` - Initialization code
-- `js/tools/` - Drawing tools
-- `js/brushes/` - Brush implementations
-- `js/stamps/` - Stamp tools
-- `js/util/` - Utilities including `display.js` (canvas management)
+**Key activities** in `workflows/activities.py`:
+- `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
+- `upload_image_to_r2()` - Uploads PNG to R2 with public access
+- `upload_metadata_to_r2()` - Uploads JSON metadata to R2
+- `append_to_gallery_metadata()` - Updates local gallery metadata file
+- `rebuild_static_site()` - Runs npm build
+- `deploy_to_cloudflare()` - Deploys via wrangler
+
+**Why Temporal?**
+- Automatic retries on failure (network issues, API rate limits, etc.)
+- Visibility into each step via Temporal UI
+- Resumable if worker crashes mid-process
+- Easy to add new steps (e.g., video processing, social media posting)
+
+### BAML Integration
+
+**BAML** (Bounded Automation Markup Language) is used to reliably extract structured data from Claude's unstructured HTML responses.
+
+**Key file**: `baml_src/artwork_metadata.baml`
+
+The BAML function `ExtractArtworkMetadata` takes Claude's final HTML response and extracts:
+- **Title**: Artwork title (e.g., "Sunset Over Mountains")
+- **Artist Statement**: Claude's description/explanation of the artwork
+
+This avoids fragile regex parsing and handles variations in Claude's response format automatically.
+
+### Gallery Architecture
+
+**Tech stack**:
+- **Framework**: SvelteKit with static adapter
+- **Styling**: Tailwind CSS
+- **Hosting**: Cloudflare Workers (with static assets)
+- **Storage**: Cloudflare R2 for images and metadata
+
+**Key design principle**: R2 is the source of truth. The local `gallery/src/lib/gallery-metadata.json` file is gitignored and regenerated from R2 as needed.
+
+**Build process**:
+1. Temporal workflow appends new artwork to local JSON
+2. SvelteKit reads JSON at build time and pre-renders all pages
+3. Static HTML/CSS/JS output deployed to Cloudflare Workers
+4. No runtime database queries - everything is pre-rendered
+
+**Routes**:
+- `/` - Gallery grid showing all artworks
+- `/artwork/[id]` - Individual artwork detail page
+
+### Reddit Integration
+
+The CLI can operate in two modes:
+
+1. **Direct mode** (with `--prompt` flag): Submit a specific prompt directly
+2. **Reddit mode** (default): Navigates to r/ClaudeDraws subreddit to find art requests
+
+When using Reddit mode, Claude browses the subreddit, picks a request, creates the artwork, and posts the gallery URL back to Reddit as a comment.
 
 ## Development Commands
 
-### Python CLI (root directory)
+### Full Stack Development Setup
 
-**Install dependencies**:
+**Terminal 1: Start Temporal server**
 ```bash
-uv sync
+docker-compose up temporal
 ```
 
-**Run the CLI tool**:
+**Terminal 2: Start Temporal worker**
 ```bash
-# First, start Chrome with CDP enabled
+docker-compose up worker
+```
+
+**Terminal 3: Gallery dev server (optional)**
+```bash
+cd gallery
+npm install
+npm run dev
+# Open http://localhost:5173
+```
+
+**Terminal 4: Run the CLI**
+```bash
+# Install Python dependencies
+uv sync
+
+# Start Chrome with CDP enabled
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=.chrome-data
 
-# Then run the tool
-uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id> --prompt "Your prompt here"
+# Get CDP URL from http://localhost:9222/json and run:
+uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id>
+
+# Or with a direct prompt:
+uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id> --prompt "Draw a happy sun"
 ```
 
 **Note**: The CDP URL comes from navigating to `http://localhost:9222/json` in another browser and copying the `webSocketDebuggerUrl` of the browser target.
 
-### Kid Pix Development (kidpix/ directory)
+### Gallery Development
 
 **Install dependencies**:
 ```bash
+cd gallery
 npm install
 ```
 
-**Build the app** (required after any JS changes):
+**Run dev server**:
 ```bash
-./build.sh
+npm run dev
 ```
 
-**Run locally**:
+**Build for production**:
 ```bash
-python3 -m http.server 8000
-# Then open http://localhost:8000
+npm run build
+```
+
+**Deploy to Cloudflare Workers**:
+```bash
+wrangler deploy
+```
+
+### BAML Development
+
+**Regenerate BAML client** (after editing `.baml` files):
+```bash
+# BAML will auto-generate Python client in baml_client/
+baml generate
 ```
 
 ## Important Constraints
 
 - **Chrome data directory**: `.chrome-data/` is used for isolated Chrome profile (gitignored). Claude for Chrome extension must be installed and logged in here before running the CLI tool
-- **Kid Pix canvas**: Intentionally starts blank (no localStorage, no splash) for fresh commissions each time Claude opens a new tab.
+- **Gallery metadata**: `gallery/src/lib/gallery-metadata.json` is gitignored - it's auto-generated by Temporal workflows and should not be checked into Git
+- **Environment variables**: Required in `.env`:
+  - `R2_ACCOUNT_ID` - Cloudflare R2 account ID
+  - `R2_ACCESS_KEY_ID` - R2 API access key
+  - `R2_SECRET_ACCESS_KEY` - R2 API secret key
+  - `R2_BUCKET_NAME` - R2 bucket name (e.g., `claudedraws-dev`)
+  - `R2_PUBLIC_URL` - Public R2 URL (e.g., `https://r2.claudedraws.com`)
+  - `TEMPORAL_HOST` - Temporal server address (default: `localhost:7233`)
+- **Docker Compose**: Temporal server and worker must be running for the full workflow to complete
+
+## Troubleshooting
+
+### Temporal workflow not starting
+- Check that Temporal server is running: `docker-compose ps`
+- Check that worker is running and connected: Check logs with `docker-compose logs worker`
+- Verify environment variables in `.env`
+
+### Gallery not updating
+- Check Temporal workflow status in Temporal UI (http://localhost:8233)
+- Verify `gallery/src/lib/gallery-metadata.json` exists and contains new artwork
+- Check SvelteKit build logs for errors
+- Verify wrangler deployment succeeded
+
+### BAML extraction errors
+- Check that the HTML response from Claude contains title and description
+- Review BAML function definition in `baml_src/artwork_metadata.baml`
+- Check BAML extraction logs in Temporal activity output

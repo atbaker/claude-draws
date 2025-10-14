@@ -461,6 +461,9 @@ async def submit_claude_prompt(cdp_url: str, prompt: str | None) -> str:
         # Result is a dict with: artwork_url, title, artist_statement
         result = await trigger_workflow()
 
+        # Close the side panel before continuing
+        side_panel_page.close()
+
         # Post comment to Reddit if we're in Reddit mode
         if reddit_post_url is not None:
             await post_reddit_comment(
