@@ -37,11 +37,14 @@ class ProcessArtworkWorkflow:
         reddit_url: URL of Reddit post that inspired this artwork
 
     Returns:
-        Gallery URL where the artwork can be viewed
+        dict: Dictionary containing:
+            - artwork_url: Gallery URL where the artwork can be viewed
+            - title: Title of the artwork
+            - artist_statement: Artist statement from Claude
     """
 
     @workflow.run
-    async def run(self, image_path: str, response_html: str, reddit_url: str) -> str:
+    async def run(self, image_path: str, response_html: str, reddit_url: str) -> dict:
         # Generate artwork ID based on timestamp
         # Use workflow.now() for deterministic time
         artwork_id = f"kidpix-{int(workflow.now().timestamp())}"
@@ -123,8 +126,12 @@ class ProcessArtworkWorkflow:
 
         workflow.logger.info(f"Deployed to Cloudflare: {gallery_url}")
 
-        # Return the full artwork URL
+        # Return the full artwork URL and metadata
         artwork_url = f"{gallery_url}/artwork/{artwork_id}"
         workflow.logger.info(f"✓ Artwork processing complete: {artwork_url}")
 
-        return artwork_url
+        return {
+            "artwork_url": artwork_url,
+            "title": title,
+            "artist_statement": artist_statement,
+        }

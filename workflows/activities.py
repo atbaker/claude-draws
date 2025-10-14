@@ -53,19 +53,21 @@ async def extract_artwork_metadata(response_html: str) -> Tuple[str, str]:
     """
     activity.logger.info("Extracting artwork metadata with BAML...")
 
-    try:
-        # Call BAML function to extract structured metadata
-        metadata = b.ExtractArtworkMetadata(response_html)
+    # try:
+    # Call BAML function to extract structured metadata
+    metadata = b.ExtractArtworkMetadata(response_html)
 
-        activity.logger.info(f"✓ Extracted title: {metadata.title}")
-        activity.logger.info(f"✓ Extracted artist statement ({len(metadata.artist_statement)} chars)")
+    activity.logger.info(f"✓ Extracted title: {metadata.title}")
+    activity.logger.info(f"✓ Extracted artist statement ({len(metadata.artist_statement)} chars)")
 
-        return (metadata.title, metadata.artist_statement)
+    return (metadata.title, metadata.artist_statement)
 
-    except Exception as e:
-        activity.logger.error(f"✗ Error extracting metadata: {e}")
-        # Return fallback values if extraction fails
-        return ("Claude Draws Artwork", "Artwork created with Kid Pix")
+    # TODO: Proactively raise exceptions for now, would rather fix them via BAML than
+    # swallow them
+    # except Exception as e:
+    #     activity.logger.error(f"✗ Error extracting metadata: {e}")
+    #     # Return fallback values if extraction fails
+    #     return ("Claude Draws Artwork", "Artwork created with Kid Pix")
 
 
 @activity.defn

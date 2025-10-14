@@ -1,5 +1,6 @@
 """CLI interface for Claude Draws."""
 
+import asyncio
 import click
 from claudedraw.browser import submit_claude_prompt
 
@@ -31,7 +32,7 @@ def start(cdp_url: str, prompt: str | None):
     else:
         click.echo("Reddit mode: Claude will navigate to r/ClaudeDraws for requests")
 
-    gallery_url = submit_claude_prompt(cdp_url, prompt)
+    gallery_url = asyncio.run(submit_claude_prompt(cdp_url, prompt))
     click.echo(f"\n✓ Done! Artwork available at: {gallery_url}")
 
 
