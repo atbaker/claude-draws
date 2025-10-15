@@ -1,0 +1,190 @@
+"""Temporal workflow for creating Claude Draws artwork."""
+
+from datetime import timedelta
+
+from temporalio import workflow
+from temporalio.common import RetryPolicy
+
+# Import activities
+with workflow.unsafe.imports_passed_through():
+    from workflows.activities import (
+        append_to_gallery_metadata,
+        browser_session_activity,
+        deploy_to_cloudflare,
+        extract_artwork_metadata,
+        post_reddit_comment_activity,
+        rebuild_static_site,
+        schedule_next_workflow,
+        upload_image_to_r2,
+        upload_metadata_to_r2,
+        BrowserSessionResult,
+    )
+
+
+@workflow.defn
+class CreateArtworkWorkflow:
+    """
+    Workflow for creating artwork from Reddit requests.
+
+    This workflow handles the entire end-to-end process:
+    1. Finds a Reddit request via browser automation
+    2. Submits prompt to Claude for Chrome
+    3. Waits for Claude to complete the artwork
+    4. Downloads the artwork image
+    5. Extracts metadata (title and artist statement)
+    6. Uploads image and metadata to R2
+    7. Rebuilds and deploys the gallery
+    8. Posts a comment on Reddit with the result
+    9. Optionally schedules the next workflow (for continuous mode)
+
+    Args:
+        cdp_url: Chrome DevTools Protocol endpoint URL
+        continuous: If True, schedule another workflow run after completion
+
+    Returns:
+        dict: Dictionary containing:
+            - artwork_url: Gallery URL where the artwork can be viewed
+            - reddit_post_url: URL of the Reddit post that was fulfilled
+    """
+
+    @workflow.run
+    async def run(self, cdp_url: str, continuous: bool = False) -> dict:
+        workflow.logger.info(f"Starting CreateArtworkWorkflow (continuous={continuous})")
+        workflow.logger.info(f"CDP URL: {cdp_url}")
+
+        # Activity 1: Browser session - find request, submit to Claude, wait, download
+        browser_result: BrowserSessionResult = await workflow.execute_activity(
+            browser_session_activity,
+            args=[cdp_url],
+            start_to_close_timeout=timedelta(minutes=15),  # Long timeout for drawing
+            heartbeat_timeout=timedelta(minutes=2),  # Expect heartbeats every 2 min
+            retry_policy=RetryPolicy(
+                maximum_attempts=2,  # Only retry once for browser automation
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        workflow.logger.info(f"✓ Browser session complete")
+        workflow.logger.info(f"  Reddit post: {browser_result.reddit_post_title}")
+        workflow.logger.info(f"  Image path: {browser_result.image_path}")
+
+        # Generate artwork ID based on timestamp
+        artwork_id = f"kidpix-{int(workflow.now().timestamp())}"
+
+        # Activity 2: Extract metadata from Claude's response using BAML
+        title, artist_statement = await workflow.execute_activity(
+            extract_artwork_metadata,
+            args=[browser_result.response_html],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(
+                maximum_attempts=3,
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        workflow.logger.info(f"✓ Metadata extracted")
+        workflow.logger.info(f"  Title: {title}")
+        workflow.logger.info(f"  Artist statement: {artist_statement[:100]}...")
+
+        # Activity 3: Upload image to R2
+        image_url = await workflow.execute_activity(
+            upload_image_to_r2,
+            args=[artwork_id, browser_result.image_path],
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=RetryPolicy(
+                maximum_attempts=3,
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        workflow.logger.info(f"✓ Image uploaded: {image_url}")
+
+        # Activity 4: Upload metadata JSON to R2
+        metadata = {
+            "id": artwork_id,
+            "title": title,
+            "artistStatement": artist_statement,
+            "redditPostUrl": browser_result.reddit_post_url,
+            "createdAt": workflow.now().isoformat(),
+            "videoUrl": None,
+        }
+
+        await workflow.execute_activity(
+            upload_metadata_to_r2,
+            args=[artwork_id, metadata],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+
+        workflow.logger.info("✓ Metadata uploaded to R2")
+
+        # Activity 5: Append to local gallery-metadata.json
+        await workflow.execute_activity(
+            append_to_gallery_metadata,
+            args=[artwork_id, image_url, metadata],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+
+        workflow.logger.info("✓ Appended to gallery metadata")
+
+        # Activity 6: Rebuild static site
+        await workflow.execute_activity(
+            rebuild_static_site,
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=2),
+        )
+
+        workflow.logger.info("✓ Static site rebuilt")
+
+        # Activity 7: Deploy to Cloudflare Workers
+        gallery_base_url = await workflow.execute_activity(
+            deploy_to_cloudflare,
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+
+        artwork_url = f"{gallery_base_url}/artwork/{artwork_id}"
+        workflow.logger.info(f"✓ Deployed to Cloudflare: {artwork_url}")
+
+        # Activity 8: Post comment on Reddit
+        await workflow.execute_activity(
+            post_reddit_comment_activity,
+            args=[
+                cdp_url,
+                browser_result.reddit_post_url,
+                browser_result.reddit_post_id,
+                title,
+                artist_statement,
+                browser_result.image_path,
+                artwork_url,
+            ],
+            start_to_close_timeout=timedelta(minutes=3),
+            retry_policy=RetryPolicy(
+                maximum_attempts=3,
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        workflow.logger.info("✓ Posted comment on Reddit")
+
+        # Activity 9: Schedule next workflow if continuous mode
+        if continuous:
+            workflow.logger.info("Continuous mode: scheduling next workflow...")
+            await workflow.execute_activity(
+                schedule_next_workflow,
+                args=[cdp_url, continuous],
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=RetryPolicy(
+                    maximum_attempts=3,
+                    backoff_coefficient=2.0,
+                ),
+            )
+            workflow.logger.info("✓ Next workflow scheduled")
+
+        # Return result
+        workflow.logger.info(f"✓ Workflow complete: {artwork_url}")
+        return {
+            "artwork_url": artwork_url,
+            "reddit_post_url": browser_result.reddit_post_url,
+        }

@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Test script for the ProcessArtworkWorkflow."""
+"""
+Test script for the CreateArtworkWorkflow.
+
+NOTE: This script is now deprecated. The new CreateArtworkWorkflow handles the
+entire end-to-end process including browser automation to find Reddit requests.
+
+To test the full workflow:
+    uv run claudedraw start --cdp-url <url>
+
+This test script is kept for reference but may not work as expected since
+the workflow signature has changed.
+"""
 
 import asyncio
 import os
@@ -12,8 +23,6 @@ from temporalio.client import Client
 # Add parent directory to path so we can import workflows
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from workflows.process_artwork import ProcessArtworkWorkflow
-
 # Load environment variables
 load_dotenv()
 
@@ -22,44 +31,20 @@ TASK_QUEUE = "claude-draws-queue"
 
 
 async def main():
-    """Test the artwork processing workflow."""
-    # Get test image path from command line or use default
-    if len(sys.argv) > 1:
-        image_path = sys.argv[1]
-    else:
-        # Use the existing test image
-        image_path = str(Path(__file__).parent.parent / "downloads" / "kidpix-1760288744.png")
-
-    if not Path(image_path).exists():
-        print(f"Error: Image file not found: {image_path}")
-        print(f"\nUsage: {sys.argv[0]} [path/to/image.png]")
-        sys.exit(1)
-
-    print(f"Testing ProcessArtworkWorkflow with image: {image_path}")
-    print(f"Connecting to Temporal at: {TEMPORAL_HOST}")
-    print()
-
-    # Connect to Temporal
-    client = await Client.connect(TEMPORAL_HOST)
-
-    # Start the workflow
-    print("Starting workflow...")
-    result = await client.execute_workflow(
-        ProcessArtworkWorkflow.run,
-        args=[
-            image_path,
-            "Test Artwork (Workflow Test)",
-            "https://reddit.com/r/test/comments/test123",
-        ],
-        id=f"test-workflow-{int(asyncio.get_event_loop().time())}",
-        task_queue=TASK_QUEUE,
-    )
-
-    print()
+    """Test the workflow (deprecated - see note above)."""
     print("=" * 60)
-    print("✓ Workflow completed successfully!")
-    print(f"Artwork URL: {result}")
+    print("DEPRECATED TEST SCRIPT")
     print("=" * 60)
+    print()
+    print("This script is deprecated. The CreateArtworkWorkflow now handles")
+    print("the entire end-to-end process including browser automation.")
+    print()
+    print("To test the workflow, use:")
+    print("    uv run claudedraw start --cdp-url <url>")
+    print()
+    print("Get CDP URL from: http://localhost:9222/json")
+    print("=" * 60)
+    sys.exit(1)
 
 
 if __name__ == "__main__":

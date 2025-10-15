@@ -14,13 +14,16 @@ load_dotenv()
 # Import workflow and activities
 from workflows.activities import (
     append_to_gallery_metadata,
+    browser_session_activity,
     deploy_to_cloudflare,
     extract_artwork_metadata,
+    post_reddit_comment_activity,
     rebuild_static_site,
+    schedule_next_workflow,
     upload_image_to_r2,
     upload_metadata_to_r2,
 )
-from workflows.process_artwork import ProcessArtworkWorkflow
+from workflows.create_artwork import CreateArtworkWorkflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,14 +47,17 @@ async def main():
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[ProcessArtworkWorkflow],
+        workflows=[CreateArtworkWorkflow],
         activities=[
+            browser_session_activity,
             extract_artwork_metadata,
             upload_image_to_r2,
             upload_metadata_to_r2,
             append_to_gallery_metadata,
             rebuild_static_site,
             deploy_to_cloudflare,
+            post_reddit_comment_activity,
+            schedule_next_workflow,
         ],
     )
 

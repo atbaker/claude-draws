@@ -25,9 +25,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Key Architecture Details
 
-### Browser Automation with Playwright + CDP
+### Temporal Workflow Architecture
 
-The core automation flow in `claudedraw/browser.py`:
+**Primary Workflow**: `workflows/create_artwork.py` - `CreateArtworkWorkflow`
+
+The workflow handles the **complete end-to-end process**:
+
+1. **Browser automation** - Finds Reddit request, submits to Claude, waits for completion
+2. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
+3. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket
+4. **Uploads metadata to R2** - Stores JSON metadata file alongside image
+5. **Appends to gallery metadata** - Updates local `gallery/src/lib/gallery-metadata.json` (gitignored)
+6. **Rebuilds static site** - Runs `npm run build` in gallery directory
+7. **Deploys to Cloudflare Workers** - Runs `wrangler deploy` to push updates live
+8. **Posts Reddit comment** - Shares completed artwork with requester
+9. **Schedules next workflow** (continuous mode only) - Enables livestream operation
+
+**Key activities** in `workflows/activities.py`:
+- `browser_session_activity()` - Long-running activity that automates the browser (find request → submit → wait → download)
+- `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
+- `upload_image_to_r2()` - Uploads PNG to R2 with public access
+- `upload_metadata_to_r2()` - Uploads JSON metadata to R2
+- `append_to_gallery_metadata()` - Updates local gallery metadata file
+- `rebuild_static_site()` - Runs npm build
+- `deploy_to_cloudflare()` - Deploys via wrangler
+- `post_reddit_comment_activity()` - Posts comment, approves/stickies it, updates flair
+- `schedule_next_workflow()` - Schedules next workflow run (continuous mode)
+
+**Browser Automation Details** (implemented in `browser_session_activity()`):
 
 1. **Environment variable must be set BEFORE importing Playwright**: `os.environ['PW_CHROMIUM_ATTACH_TO_OTHER'] = '1'`
    - This is critical - it enables Playwright's Node.js server to attach to Chrome extension side panels (which are targets of type "other")
@@ -41,33 +66,17 @@ The core automation flow in `claudedraw/browser.py`:
    - After opening side panel with Command+E, must use `page.wait_for_timeout()` (not `time.sleep()`) to allow Playwright's context to update
    - Then iterate through `context.pages` to find the page with the Claude for Chrome extension ID in its URL
 
-### Temporal Workflow Architecture
-
-**Workflow**: `workflows/process_artwork.py` - `ProcessArtworkWorkflow`
-
-After Claude finishes creating an artwork, the CLI triggers a Temporal workflow that:
-
-1. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
-2. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket
-3. **Uploads metadata to R2** - Stores JSON metadata file alongside image
-4. **Appends to gallery metadata** - Updates local `gallery/src/lib/gallery-metadata.json` (gitignored)
-5. **Rebuilds static site** - Runs `npm run build` in gallery directory
-6. **Deploys to Cloudflare Workers** - Runs `wrangler deploy` to push updates live
-7. **Returns gallery URL** - Provides public artwork URL for posting back to Reddit
-
-**Key activities** in `workflows/activities.py`:
-- `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
-- `upload_image_to_r2()` - Uploads PNG to R2 with public access
-- `upload_metadata_to_r2()` - Uploads JSON metadata to R2
-- `append_to_gallery_metadata()` - Updates local gallery metadata file
-- `rebuild_static_site()` - Runs npm build
-- `deploy_to_cloudflare()` - Deploys via wrangler
+4. **Heartbeats during long operations**:
+   - The browser session activity sends heartbeats to Temporal every 30 seconds while waiting for Claude
+   - Allows Temporal to detect worker crashes during the 5-10 minute drawing process
 
 **Why Temporal?**
 - Automatic retries on failure (network issues, API rate limits, etc.)
 - Visibility into each step via Temporal UI
 - Resumable if worker crashes mid-process
+- Heartbeat mechanism for long-running operations
 - Easy to add new steps (e.g., video processing, social media posting)
+- Continuous mode support for livestreaming
 
 ### BAML Integration
 
@@ -103,12 +112,16 @@ This avoids fragile regex parsing and handles variations in Claude's response fo
 
 ### Reddit Integration
 
-The CLI can operate in two modes:
+The workflow automatically:
+1. Navigates to r/ClaudeDraws
+2. Finds the first "Open" request
+3. Extracts the request details (author, title, body, reference images)
+4. Creates the artwork based on the request
+5. Posts a comment with the completed artwork
+6. Approves and stickies the comment
+7. Updates the post flair to "Completed"
 
-1. **Direct mode** (with `--prompt` flag): Submit a specific prompt directly
-2. **Reddit mode** (default): Navigates to r/ClaudeDraws subreddit to find art requests
-
-When using Reddit mode, Claude browses the subreddit, picks a request, creates the artwork, and posts the gallery URL back to Reddit as a comment.
+All Reddit interaction is handled within the Temporal workflow activities, providing automatic retries and visibility.
 
 ## Development Commands
 
@@ -143,11 +156,17 @@ uv sync
 # Get CDP URL from http://localhost:9222/json and run:
 uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id>
 
-# Or with a direct prompt:
-uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id> --prompt "Draw a happy sun"
+# For continuous mode (livestream):
+uv run claudedraw start --continuous --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id>
 ```
 
 **Note**: The CDP URL comes from navigating to `http://localhost:9222/json` in another browser and copying the `webSocketDebuggerUrl` of the browser target.
+
+**Continuous Mode**:
+- Automatically schedules the next workflow after each artwork completes
+- Perfect for livestreaming - the workflow runs indefinitely
+- Each artwork gets its own workflow in Temporal UI for easy debugging
+- Stop by canceling the active workflow in Temporal UI
 
 ### Gallery Development
 
