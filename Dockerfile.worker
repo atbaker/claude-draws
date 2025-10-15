@@ -10,23 +10,19 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python package management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
 
-# Copy Python dependencies
-COPY pyproject.toml uv.lock ./
+# Copy application code first (needed for editable install)
+COPY . .
 
 # Install Python dependencies
 RUN uv sync --frozen
 
 # Install wrangler globally
 RUN npm install -g wrangler
-
-# Copy application code
-COPY . .
 
 # Install gallery dependencies
 WORKDIR /app/gallery

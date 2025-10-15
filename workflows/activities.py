@@ -10,7 +10,6 @@ from typing import Dict, Optional, Tuple
 
 import asyncpraw
 import boto3
-import pyautogui
 from botocore.exceptions import ClientError
 from baml_client.sync_client import b
 from dotenv import load_dotenv
@@ -40,6 +39,7 @@ TASK_QUEUE = "claude-draws-queue"
 
 # Chrome Extension
 CLAUDE_EXTENSION_ID = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
+ONBOARDING_PAGE_URL = "https://claude.ai/chrome/installed"
 
 # Reddit API credentials
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -146,6 +146,64 @@ async def format_reddit_post_prompt(post) -> str:
     return "\n".join(post_details) + "\n\n---\n\n" + static_prompt
 
 
+async def open_claude_side_panel(page, context):
+    """
+    Open Claude for Chrome side panel using the official onboarding page mechanism.
+
+    This uses Anthropic's onboarding button to trigger the side panel without
+    needing OS-level keyboard automation (pyautogui).
+
+    Args:
+        page: The current Playwright page
+        context: The browser context containing all pages
+
+    Returns:
+        The Playwright page object for the Claude side panel
+
+    Raises:
+        RuntimeError: If the side panel cannot be opened or found
+    """
+    activity.logger.info(f"Navigating to onboarding page: {ONBOARDING_PAGE_URL}")
+    await page.goto(ONBOARDING_PAGE_URL, wait_until="domcontentloaded")
+
+    # Wait for the hidden onboarding button to be present
+    activity.logger.info("Waiting for onboarding button...")
+    try:
+        await page.locator("#claude-onboarding-button").wait_for(state="hidden", timeout=10000)
+        activity.logger.info("Found onboarding button")
+    except Exception as e:
+        raise RuntimeError(f"Could not find onboarding button: {e}")
+
+    # Set prompt to a single space (better UX - we'll fill in real prompt later)
+    # and click the button to open side panel
+    activity.logger.info("Triggering side panel via onboarding button...")
+    await page.evaluate("""
+        document.getElementById('claude-onboarding-button')
+            .setAttribute('data-task-prompt', ' ');
+        document.getElementById('claude-onboarding-button').click();
+    """)
+
+    # Wait a moment for side panel to open
+    await page.wait_for_timeout(2000)
+
+    # Find the side panel page
+    activity.logger.info("Finding side panel page...")
+    side_panel_page = None
+    for p in context.pages:
+        if CLAUDE_EXTENSION_ID in p.url:
+            side_panel_page = p
+            activity.logger.info(f"Found side panel: {p.url}")
+            break
+
+    if not side_panel_page:
+        raise RuntimeError("Could not find Claude side panel page after opening")
+
+    # Wait one more moment so livestream viewers can see the side panel
+    await page.wait_for_timeout(2000)
+
+    return side_panel_page
+
+
 @activity.defn
 async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
     """
@@ -244,28 +302,14 @@ async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
             post_title = post.title
             activity.logger.info(f"Request from u/{author_name}: {post_title}")
 
+        # Open Claude side panel using the official onboarding page mechanism
+        activity.logger.info("Opening Claude side panel...")
+        side_panel_page = await open_claude_side_panel(page, context)
+
         # Navigate to Kid Pix
         activity.logger.info("Navigating to Kid Pix...")
         await page.goto('http://localhost:8000')
         await page.wait_for_load_state('domcontentloaded')
-
-        # Open Claude side panel using OS-level keyboard shortcut
-        await page.wait_for_timeout(1000)
-        activity.logger.info("Opening Claude side panel with Command+E...")
-        pyautogui.hotkey('command', 'e')
-        await page.wait_for_timeout(5000)
-
-        # Find the side panel page
-        activity.logger.info("Finding side panel page...")
-        side_panel_page = None
-        for p in context.pages:
-            if CLAUDE_EXTENSION_ID in p.url:
-                side_panel_page = p
-                activity.logger.info(f"Found side panel: {p.url}")
-                break
-
-        if not side_panel_page:
-            raise RuntimeError("Could not find Claude side panel page")
 
         # Wait for message input and submit prompt
         activity.logger.info("Submitting prompt to Claude...")
