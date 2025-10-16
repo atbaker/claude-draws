@@ -21,19 +21,33 @@ services:
       temporal:
         condition: service_healthy
     environment:
+      # Override TEMPORAL_HOST to use docker-compose service name
       - TEMPORAL_HOST=temporal:7233
-      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
-      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
-      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
-      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
-      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
     volumes:
       - .:/app
       - /app/.venv
       - /app/node_modules
       - /app/gallery/node_modules
+      - ./gallery/src/lib/gallery-metadata.json:/app/gallery/src/lib/gallery-metadata.json
     working_dir: /app
     command: uv run python -m worker.main
+
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      worker:
+        condition: service_started
+    environment:
+      # Override TEMPORAL_HOST to use docker-compose service name
+      - TEMPORAL_HOST=temporal:7233
+    volumes:
+      - .:/app
+      - /app/.venv
+    working_dir: /app
+    restart: no
+    command: sh -c "source .env && uv run claudedraw start --cdp-url \"$$CDP_URL\" $${CONTINUOUS:+--continuous}"
 
 volumes:
   temporal-data:

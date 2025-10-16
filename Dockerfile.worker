@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 
-# Install Node.js and npm
+# Install Node.js and npm, plus Playwright system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     git \
