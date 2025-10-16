@@ -24,6 +24,7 @@ from workflows.activities import (
     upload_metadata_to_r2,
 )
 from workflows.create_artwork import CreateArtworkWorkflow
+from workflows.deploy_gallery import DeployGalleryWorkflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,7 +48,7 @@ async def main():
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[CreateArtworkWorkflow],
+        workflows=[CreateArtworkWorkflow, DeployGalleryWorkflow],
         activities=[
             browser_session_activity,
             extract_artwork_metadata,

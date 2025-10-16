@@ -11,6 +11,6 @@ You are currently on the Kid Pix interface at `http://localhost:8000`.
 6. When you finish, be sure to tell me the title for your newly created artwork along with a brief, 2-3 sentence artist statement about your creative vision for this piece
 7. Be creative and have fun! Kid Pix is a nostalgic drawing program with unique tools and effects
 
-**DO NOT** work on your artwork for longer than five minutes. When the timer on the web page says "No time remaining" you should wrap up.
+**DO NOT** work on your artwork for longer than five minutes. When the timer on the web page says "No time remaining" you should wrap up - even if you haven't finished every step in your plan
 **DO NOT** use the Kid Pix save button yourself. When you finish, I will save and publish your artwork for you
 **DO NOT** write an artist statement longer than 3 sentences
