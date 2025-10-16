@@ -14,7 +14,7 @@ class ArtworkMetadata {
 
 // Extract artwork title and artist statement from Claude for Chrome's HTML response
 function ExtractArtworkMetadata(response_html: string) -> ArtworkMetadata {
-  client CustomSonnet45
+  client DeterministicSonnet45
   prompt #"
     You are parsing HTML from a Claude for Chrome response where Claude just finished creating
     artwork in Kid Pix based on a Reddit user's request.

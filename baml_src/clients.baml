@@ -8,6 +8,26 @@ client<llm> CustomSonnet45 {
   }
 }
 
+// Deterministic client for metadata extraction (temperature 0)
+client<llm> DeterministicSonnet45 {
+  provider anthropic
+  options {
+    model "claude-sonnet-4-5-20250929"
+    api_key env.ANTHROPIC_API_KEY
+    temperature 0
+  }
+}
+
+// Creative client for prompt generation (temperature 1.0)
+client<llm> CreativeSonnet45 {
+  provider anthropic
+  options {
+    model "claude-sonnet-4-5-20250929"
+    api_key env.ANTHROPIC_API_KEY
+    temperature 1.0
+  }
+}
+
 // https://docs.boundaryml.com/docs/snippets/clients/retry
 retry_policy Constant {
   max_retries 3
