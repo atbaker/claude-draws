@@ -674,7 +674,7 @@ async def deploy_to_cloudflare() -> str:
 
     try:
         result = subprocess.run(
-            ["wrangler", "deploy"],
+            ["npx", "wrangler", "deploy"],
             cwd=str(GALLERY_DIR),
             capture_output=True,
             text=True,

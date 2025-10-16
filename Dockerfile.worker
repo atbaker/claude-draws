@@ -21,9 +21,6 @@ COPY . .
 # Install Python dependencies
 RUN uv sync --frozen
 
-# Install wrangler globally
-RUN npm install -g wrangler
-
 # Install gallery dependencies
 WORKDIR /app/gallery
 RUN npm install
