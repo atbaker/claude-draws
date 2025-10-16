@@ -68,6 +68,20 @@
 					{/if}
 				</div>
 
+				{#if artwork.prompt}
+					<div>
+						<details class="group">
+							<summary class="text-sm font-semibold text-gray-500 uppercase cursor-pointer hover:text-gray-700 transition-colors list-none flex items-center gap-2">
+								<span class="transform transition-transform group-open:rotate-90">▶</span>
+								Original Prompt
+							</summary>
+							<div class="mt-2 text-sm bg-gray-50 p-4 rounded-lg border border-gray-200 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+								{artwork.prompt}
+							</div>
+						</details>
+					</div>
+				{/if}
+
 				{#if artwork.videoUrl}
 					<div>
 						<h2 class="text-sm font-semibold text-gray-500 uppercase mb-1">
