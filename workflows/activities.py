@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -18,6 +18,7 @@ from playwright.async_api import async_playwright
 from pydantic import BaseModel
 from temporalio import activity
 from temporalio.client import Client
+from temporalio.common import RetryPolicy
 
 # Load environment variables
 load_dotenv()
@@ -867,6 +868,9 @@ async def schedule_next_workflow(cdp_url: str, continuous: bool) -> None:
     """
     Schedule the next workflow run for continuous operation.
 
+    This activity is only called when continuous=True, so we always apply
+    the infinite retry policy here.
+
     Args:
         cdp_url: Chrome DevTools Protocol URL to pass to next workflow
         continuous: Whether to continue scheduling (should always be True when called)
@@ -881,11 +885,20 @@ async def schedule_next_workflow(cdp_url: str, continuous: bool) -> None:
         timestamp = int(time.time())
         workflow_id = f"claude-draws-{timestamp}"
 
+        # Apply infinite retry policy for continuous mode
+        retry_policy = RetryPolicy(
+            initial_interval=timedelta(seconds=10),
+            maximum_interval=timedelta(minutes=3),
+            backoff_coefficient=2.0,
+            maximum_attempts=0,  # Infinite retries
+        )
+
         await client.start_workflow(
             "CreateArtworkWorkflow",
             args=[cdp_url, continuous],
             id=workflow_id,
             task_queue=TASK_QUEUE,
+            retry_policy=retry_policy,
         )
 
         activity.logger.info(f"✓ Scheduled next workflow: {workflow_id}")

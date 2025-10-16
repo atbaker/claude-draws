@@ -4,11 +4,13 @@ import asyncio
 import os
 import sys
 import time
+from datetime import timedelta
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
 from temporalio.client import Client
+from temporalio.common import RetryPolicy
 
 # Add parent directory to path so we can import workflows
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -78,11 +80,27 @@ async def start_workflow(cdp_url: str, continuous: bool):
 
         from workflows.create_artwork import CreateArtworkWorkflow
 
+        # Configure retry policy based on continuous mode
+        if continuous:
+            # Infinite retries for continuous/livestream mode
+            # Keep the show going even if there are bugs!
+            retry_policy = RetryPolicy(
+                initial_interval=timedelta(seconds=10),
+                maximum_interval=timedelta(minutes=3),  # Cap retry delay at 3 minutes
+                backoff_coefficient=2.0,
+                maximum_attempts=0,  # 0 = infinite retries
+            )
+        else:
+            # Single mode: fail fast on errors (no workflow-level retries)
+            # Activity-level retries will still happen
+            retry_policy = None
+
         handle = await client.start_workflow(
             CreateArtworkWorkflow.run,
             args=[cdp_url, continuous],
             id=workflow_id,
             task_queue=TASK_QUEUE,
+            retry_policy=retry_policy,
         )
 
         click.echo("✓ Workflow started successfully!\n")
