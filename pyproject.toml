@@ -9,6 +9,7 @@ dependencies = [
     "baml-py>=0.211.2",
     "boto3>=1.40.50",
     "click>=8.3.0",
+    "jinja2>=3.1.6",
     "playwright>=1.55.0",
     "pydantic>=2.12.0",
     "python-dotenv>=1.1.1",
