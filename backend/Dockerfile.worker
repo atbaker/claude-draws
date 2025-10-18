@@ -12,21 +12,25 @@ RUN apt-get update && apt-get install -y \
 # Install uv for Python package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set working directory
-WORKDIR /app
+# Set working directory to backend
+WORKDIR /app/backend
 
-# Copy application code first (needed for editable install)
-COPY . .
+# Copy backend code (needed for editable install)
+COPY backend/ .
 
 # Install Python dependencies
 RUN uv sync --frozen
 
-# Install gallery dependencies
+# Generate BAML client (only `baml_src` is in git)
+RUN uv run baml-cli generate
+
+# Install gallery dependencies (needed for workflow activities)
 WORKDIR /app/gallery
+COPY gallery/package*.json ./
 RUN npm install
 
-# Back to root
-WORKDIR /app
+# Back to backend directory
+WORKDIR /app/backend
 
 # Default command (can be overridden in docker-compose)
 CMD ["uv", "run", "python", "-m", "worker.main"]

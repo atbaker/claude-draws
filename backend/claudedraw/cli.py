@@ -22,6 +22,9 @@ load_dotenv()
 TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
 TASK_QUEUE = "claude-draws-queue"
 
+# Chrome DevTools Protocol
+CHROME_CDP_URL = os.getenv("CHROME_CDP_URL")
+
 
 @click.group()
 def cli():
@@ -31,27 +34,30 @@ def cli():
 
 @cli.command()
 @click.option(
-    '--cdp-url',
-    required=True,
-    help='Chrome DevTools Protocol URL (e.g., ws://127.0.0.1:9222/devtools/browser/...)'
-)
-@click.option(
     '--continuous',
     is_flag=True,
     default=False,
     help='Run continuously for livestream mode (schedules new workflow after each completion)'
 )
-def start(cdp_url: str, continuous: bool):
+def start(continuous: bool):
     """Start the Claude Draws workflow."""
+    # Validate CDP URL from environment
+    if not CHROME_CDP_URL:
+        click.echo("Error: CHROME_CDP_URL environment variable is not set", err=True)
+        click.echo("\nPlease set it in backend/.env:", err=True)
+        click.echo("  CHROME_CDP_URL=ws://127.0.0.1:9222/devtools/browser/...", err=True)
+        click.echo("\nGet the URL from http://localhost:9222/json", err=True)
+        raise click.Abort()
+
     click.echo("=" * 60)
     click.echo("Claude Draws - Workflow Launcher")
     click.echo("=" * 60)
-    click.echo(f"\nCDP URL: {cdp_url}")
+    click.echo(f"\nCDP URL: {CHROME_CDP_URL}")
     click.echo(f"Continuous mode: {continuous}")
     click.echo(f"Temporal server: {TEMPORAL_HOST}")
     click.echo(f"Task queue: {TASK_QUEUE}\n")
 
-    asyncio.run(start_workflow(cdp_url, continuous))
+    asyncio.run(start_workflow(CHROME_CDP_URL, continuous))
 
 
 async def start_workflow(cdp_url: str, continuous: bool):

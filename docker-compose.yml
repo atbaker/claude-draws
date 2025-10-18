@@ -16,7 +16,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: backend/Dockerfile.worker
     depends_on:
       temporal:
         condition: service_healthy
@@ -24,18 +24,18 @@ services:
       # Override TEMPORAL_HOST to use docker-compose service name
       - TEMPORAL_HOST=temporal:7233
     volumes:
-      - .:/app
-      - /app/.venv
-      - /app/node_modules
+      - ./backend:/app/backend
+      - ./gallery:/app/gallery
+      - /app/backend/.venv
       - /app/gallery/node_modules
       - ./gallery/src/lib/gallery-metadata.json:/app/gallery/src/lib/gallery-metadata.json
-    working_dir: /app
+    working_dir: /app/backend
     command: uv run python -m worker.main
 
   cli:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: backend/Dockerfile.worker
     depends_on:
       worker:
         condition: service_started
@@ -43,11 +43,21 @@ services:
       # Override TEMPORAL_HOST to use docker-compose service name
       - TEMPORAL_HOST=temporal:7233
     volumes:
-      - .:/app
-      - /app/.venv
-    working_dir: /app
+      - ./backend:/app/backend
+      - /app/backend/.venv
+    working_dir: /app/backend
     restart: no
-    command: sh -c "source .env && uv run claudedraw start --cdp-url \"$$CDP_URL\" $${CONTINUOUS:+--continuous}"
+    command: sh -c "source ../.env && uv run claudedraw start --cdp-url \"$$CDP_URL\" $${CONTINUOUS:+--continuous}"
+
+  gallery:
+    image: node:22-slim
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./gallery:/app
+      - /app/node_modules
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
 
 volumes:
   temporal-data:

@@ -2,7 +2,6 @@
 name = "claude-draws"
 version = "0.1.0"
 description = "Crowdsourced illustrations using Claude for Chrome and Kid Pix"
-readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "asyncpraw>=7.8.1",
@@ -20,7 +19,10 @@ dependencies = [
 claudedraw = "claudedraw.cli:cli"
 
 [tool.setuptools]
-packages = ["claudedraw"]
+packages = ["claudedraw", "worker", "workflows"]
+
+[tool.setuptools.package-dir]
+"" = "."
 
 [tool.uv]
 package = true

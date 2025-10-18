@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from Reddit requests. The complete workflow:
 
-1. **Python CLI** (`claudedraw/`) monitors r/ClaudeDraws for art requests
+1. **Python CLI** (`backend/claudedraw/`) monitors r/ClaudeDraws for art requests
 2. **Browser automation** (Playwright + CDP) submits prompts to Claude for Chrome extension
 3. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
 4. **Temporal workflows** orchestrate the post-processing pipeline
@@ -15,19 +15,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 7. **SvelteKit gallery** (`gallery/`) displays all artworks at claudedraws.com
 8. **Cloudflare Workers** hosts the static gallery site
 
+### Repository Structure (Monorepo)
+
+This repository uses a monorepo structure to organize different components:
+
+```
+claude-draws/
+├── backend/              # Python backend (CLI, Temporal workflows, BAML)
+│   ├── claudedraw/      # CLI tool for browser automation
+│   ├── workflows/       # Temporal workflow definitions
+│   ├── worker/          # Temporal worker process
+│   ├── baml_src/        # BAML definitions for metadata extraction
+│   ├── pyproject.toml   # Python dependencies
+│   └── Dockerfile.worker # Container for worker
+├── gallery/             # SvelteKit frontend (static site)
+├── .chrome-data/        # Chrome profile for automation (gitignored)
+├── downloads/           # Temporary artwork storage (gitignored)
+├── docs/               # Documentation
+└── docker-compose.yml  # Orchestrates all services
+```
+
 ### Key Components
 
-1. **Python CLI tool** (`claudedraw/`) - Browser automation to submit prompts to Claude for Chrome
-2. **Temporal workflows** (`workflows/`) - Orchestrates artwork processing, metadata extraction, R2 upload, gallery rebuild, and deployment
-3. **Temporal worker** (`worker/`) - Runs the Temporal worker process that executes workflow activities
+1. **Python CLI tool** (`backend/claudedraw/`) - Browser automation to submit prompts to Claude for Chrome
+2. **Temporal workflows** (`backend/workflows/`) - Orchestrates artwork processing, metadata extraction, R2 upload, gallery rebuild, and deployment
+3. **Temporal worker** (`backend/worker/`) - Runs the Temporal worker process that executes workflow activities
 4. **SvelteKit gallery** (`gallery/`) - Static site deployed to Cloudflare Workers
-5. **BAML integration** (`baml_src/`) - AI-powered extraction of artwork titles and artist statements
+5. **BAML integration** (`backend/baml_src/`) - AI-powered extraction of artwork titles and artist statements
 
 ## Key Architecture Details
 
 ### Temporal Workflow Architecture
 
-**Primary Workflow**: `workflows/create_artwork.py` - `CreateArtworkWorkflow`
+**Primary Workflow**: `backend/workflows/create_artwork.py` - `CreateArtworkWorkflow`
 
 The workflow handles the **complete end-to-end process**:
 
@@ -41,7 +61,7 @@ The workflow handles the **complete end-to-end process**:
 8. **Posts Reddit comment** - Shares completed artwork with requester
 9. **Schedules next workflow** (continuous mode only) - Enables livestream operation
 
-**Key activities** in `workflows/activities.py`:
+**Key activities** in `backend/workflows/activities.py`:
 - `browser_session_activity()` - Long-running activity that automates the browser (find request → submit → wait → download)
 - `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
 - `upload_image_to_r2()` - Uploads PNG to R2 with public access
@@ -82,7 +102,7 @@ The workflow handles the **complete end-to-end process**:
 
 **BAML** (Bounded Automation Markup Language) is used to reliably extract structured data from Claude's unstructured HTML responses.
 
-**Key file**: `baml_src/artwork_metadata.baml`
+**Key file**: `backend/baml_src/artwork_metadata.baml`
 
 The BAML function `ExtractArtworkMetadata` takes Claude's final HTML response and extracts:
 - **Title**: Artwork title (e.g., "Sunset Over Mountains")
@@ -139,6 +159,10 @@ docker-compose up worker
 
 **Terminal 3: Gallery dev server (optional)**
 ```bash
+# Option 1: Using Docker Compose
+docker-compose up gallery
+
+# Option 2: Running locally
 cd gallery
 npm install
 npm run dev
@@ -147,20 +171,29 @@ npm run dev
 
 **Terminal 4: Run the CLI**
 ```bash
-# Install Python dependencies
+# Install Python dependencies (from backend directory)
+cd backend
 uv sync
 
-# Start Chrome with CDP enabled
+# Start Chrome with CDP enabled (from repo root)
+cd ..
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=.chrome-data
 
-# Get CDP URL from http://localhost:9222/json and run:
-uv run claudedraw start --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id>
+# Set CDP URL in backend/.env:
+# 1. Navigate to http://localhost:9222/json in another browser
+# 2. Copy the webSocketDebuggerUrl of the browser target
+# 3. Add to backend/.env:
+#    CHROME_CDP_URL=ws://127.0.0.1:9222/devtools/browser/<browser-id>
+
+# Run the CLI (from backend directory)
+cd backend
+uv run claudedraw start
 
 # For continuous mode (livestream):
-uv run claudedraw start --continuous --cdp-url ws://127.0.0.1:9222/devtools/browser/<browser-id>
+uv run claudedraw start --continuous
 ```
 
-**Note**: The CDP URL comes from navigating to `http://localhost:9222/json` in another browser and copying the `webSocketDebuggerUrl` of the browser target.
+**Note**: The CDP URL is set once in `backend/.env` and reused across sessions. Get it from `http://localhost:9222/json` (the `webSocketDebuggerUrl` of the browser target).
 
 **Continuous Mode**:
 - Automatically schedules the next workflow after each artwork completes
@@ -195,21 +228,29 @@ wrangler deploy
 
 **Regenerate BAML client** (after editing `.baml` files):
 ```bash
-# BAML will auto-generate Python client in baml_client/
-baml generate
+cd backend
+# BAML will auto-generate Python client in backend/baml_client/
+uv run baml-cli generate
 ```
 
 ## Important Constraints
 
 - **Chrome data directory**: `.chrome-data/` is used for isolated Chrome profile (gitignored). Claude for Chrome extension must be installed and logged in here before running the CLI tool
 - **Gallery metadata**: `gallery/src/lib/gallery-metadata.json` is gitignored - it's auto-generated by Temporal workflows and should not be checked into Git
-- **Environment variables**: Required in `.env`:
+- **Environment variables**: Required in `backend/.env` (copy from `backend/.env.example`):
+  - `ANTHROPIC_API_KEY` - Anthropic API key for BAML
   - `R2_ACCOUNT_ID` - Cloudflare R2 account ID
   - `R2_ACCESS_KEY_ID` - R2 API access key
   - `R2_SECRET_ACCESS_KEY` - R2 API secret key
   - `R2_BUCKET_NAME` - R2 bucket name (e.g., `claudedraws-dev`)
   - `R2_PUBLIC_URL` - Public R2 URL (e.g., `https://r2.claudedraws.com`)
+  - `REDDIT_CLIENT_ID` - Reddit API client ID
+  - `REDDIT_CLIENT_SECRET` - Reddit API client secret
+  - `REDDIT_USERNAME` - Reddit username
+  - `REDDIT_PASSWORD` - Reddit password
+  - `REDDIT_USER_AGENT` - Reddit user agent string
   - `TEMPORAL_HOST` - Temporal server address (default: `localhost:7233`)
+  - `CHROME_CDP_URL` - Chrome DevTools Protocol WebSocket URL (get from `http://localhost:9222/json`)
 - **Docker Compose**: Temporal server and worker must be running for the full workflow to complete
 
 ## Troubleshooting
@@ -217,7 +258,7 @@ baml generate
 ### Temporal workflow not starting
 - Check that Temporal server is running: `docker-compose ps`
 - Check that worker is running and connected: Check logs with `docker-compose logs worker`
-- Verify environment variables in `.env`
+- Verify environment variables in `backend/.env`
 
 ### Gallery not updating
 - Check Temporal workflow status in Temporal UI (http://localhost:8233)
@@ -227,5 +268,5 @@ baml generate
 
 ### BAML extraction errors
 - Check that the HTML response from Claude contains title and description
-- Review BAML function definition in `baml_src/artwork_metadata.baml`
+- Review BAML function definition in `backend/baml_src/artwork_metadata.baml`
 - Check BAML extraction logs in Temporal activity output

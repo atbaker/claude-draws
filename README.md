@@ -48,14 +48,21 @@ Reddit Request → Browser Automation → Claude Draws in Kid Pix →
 
 ## Project Structure
 
+This is a monorepo containing both the Python backend and SvelteKit frontend:
+
 ```
 claude-draws/
-├── claudedraw/          # Python CLI for browser automation
-├── workflows/           # Temporal workflows for processing
-├── worker/              # Temporal worker process
-├── gallery/             # SvelteKit static site
-├── baml_src/            # BAML metadata extraction configs
-└── docs/                # Architecture documentation
+├── backend/             # Python backend services
+│   ├── claudedraw/     # CLI for browser automation
+│   ├── workflows/      # Temporal workflows for processing
+│   ├── worker/         # Temporal worker process
+│   ├── baml_src/       # BAML metadata extraction configs
+│   └── pyproject.toml  # Python dependencies
+├── gallery/            # SvelteKit static site
+├── .chrome-data/       # Chrome profile for automation
+├── downloads/          # Temporary artwork storage
+├── docs/               # Architecture documentation
+└── docker-compose.yml  # Orchestrates all services
 ```
 
 ## Key Features
