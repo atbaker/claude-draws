@@ -60,6 +60,31 @@ def start(continuous: bool):
     asyncio.run(start_workflow(CHROME_CDP_URL, continuous))
 
 
+async def cancel_existing_workflows(client: Client) -> int:
+    """
+    Cancel all running CreateArtworkWorkflow instances.
+
+    This ensures only one workflow runs at a time during livestreams.
+    Uses graceful cancellation (not termination) to allow cleanup.
+
+    Args:
+        client: Connected Temporal client
+
+    Returns:
+        Number of workflows cancelled
+    """
+    query = "WorkflowType='CreateArtworkWorkflow' AND ExecutionStatus='Running'"
+
+    cancelled_count = 0
+    async for workflow_execution in client.list_workflows(query=query):
+        click.echo(f"  Cancelling workflow: {workflow_execution.id}")
+        handle = client.get_workflow_handle(workflow_execution.id)
+        await handle.cancel()
+        cancelled_count += 1
+
+    return cancelled_count
+
+
 async def start_workflow(cdp_url: str, continuous: bool):
     """Connect to Temporal and start the CreateArtworkWorkflow."""
     try:
@@ -67,6 +92,15 @@ async def start_workflow(cdp_url: str, continuous: bool):
         click.echo("Connecting to Temporal server...")
         client = await Client.connect(TEMPORAL_HOST)
         click.echo("✓ Connected to Temporal\n")
+
+        # Cancel existing workflows if running in continuous mode
+        if continuous:
+            click.echo("Continuous mode: Cancelling any existing workflows...")
+            cancelled = await cancel_existing_workflows(client)
+            if cancelled > 0:
+                click.echo(f"✓ Cancelled {cancelled} existing workflow(s)\n")
+            else:
+                click.echo("✓ No existing workflows to cancel\n")
 
         # Generate workflow ID
         timestamp = int(time.time())
