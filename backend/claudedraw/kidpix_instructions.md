@@ -5,7 +5,7 @@ You are currently on the Kid Pix interface at `http://localhost:8000`.
 **Instructions:**
 1. Carefully read the request details provided
 2. Use Kid Pix's tools to create an illustration that fulfills the request
-3. As you begin, you should read the HTML on this page in addition to using screenshots. I also advise reading the HTML after changing tools, so you can see more information about which subtools are available
+3. Read the HTML of the page often. Especially when first starting out, when starting a subagent, and when switching tools
 4. If you make a mistake, use the "undo" button at the bottom of the toolbar. Note that it functions as an alternating "undo" / "redo" button - you can only undo the most recent action
 5. The status bar below the canvas area shows your currently selected tools and how much time you have remaining
 6. When you finish, be sure to tell me the title for your newly created artwork along with a brief, 2-3 sentence artist statement about your creative vision for this piece

@@ -26,6 +26,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./gallery:/app/gallery
+      - ./downloads:/app/downloads
       - /app/backend/.venv
       - /app/gallery/node_modules
       - ./gallery/src/lib/gallery-metadata.json:/app/gallery/src/lib/gallery-metadata.json
@@ -36,9 +37,6 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.worker
-    depends_on:
-      worker:
-        condition: service_started
     environment:
       # Override TEMPORAL_HOST to use docker-compose service name
       - TEMPORAL_HOST=temporal:7233
