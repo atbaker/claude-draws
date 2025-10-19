@@ -110,7 +110,10 @@ async def get_image_urls_from_post(post):
 
 async def get_reddit_request(page) -> Optional[Dict]:
     """
-    Navigate to r/ClaudeDraws and find an open request.
+    Navigate to r/ClaudeDraws and find an open request using PRAW search.
+
+    Uses PRAW API to find the top-upvoted "Open request" post (avoiding Reddit's
+    UI search cache delays), then navigates to it in Chrome for livestream viewers.
 
     Args:
         page: Playwright page object
@@ -118,59 +121,14 @@ async def get_reddit_request(page) -> Optional[Dict]:
     Returns:
         Dict with post data, or None if no posts found
     """
-    # Navigate to r/ClaudeDraws
+    # Navigate to r/ClaudeDraws homepage for visual context
     activity.logger.info("Navigating to r/ClaudeDraws...")
     await page.goto('https://www.reddit.com/r/ClaudeDraws/')
     await page.wait_for_load_state('domcontentloaded')
     await page.wait_for_timeout(2000)
 
-    # Click "Community Guide" button
-    activity.logger.info("Opening Community Guide...")
-    community_guide_button = page.locator('#show-community-guide-btn')
-    await community_guide_button.wait_for(state="visible", timeout=10000)
-    await community_guide_button.click()
-    await page.wait_for_timeout(1000)
-
-    # Click "Open requests" link
-    activity.logger.info("Clicking on 'Open requests' link...")
-    open_requests_link = page.locator('a.resource:has-text("Open requests")')
-    await open_requests_link.wait_for(state="visible", timeout=10000)
-    await open_requests_link.evaluate('(element) => element.removeAttribute("target")')
-    await open_requests_link.click()
-    await page.wait_for_load_state('domcontentloaded')
-    await page.wait_for_timeout(2000)
-
-    # Check if there are any posts
-    activity.logger.info("Checking for open requests...")
-    first_post_link = page.locator('a[data-testid="post-title"]').first
-
-    # Check if the locator found any elements
-    post_count = await first_post_link.count()
-    if post_count == 0:
-        activity.logger.info("No open requests found on r/ClaudeDraws")
-        return None
-
-    # Click on the first post
-    activity.logger.info("Found open request, clicking on top post...")
-    await first_post_link.wait_for(state="visible", timeout=10000)
-    await first_post_link.click()
-    await page.wait_for_load_state('domcontentloaded')
-    await page.wait_for_timeout(2000)
-
-    # Extract post ID from URL
-    current_url = page.url
-    activity.logger.info(f"Post URL: {current_url}")
-
-    import re
-    post_id_match = re.search(r'/comments/([a-z0-9]+)/', current_url)
-    if not post_id_match:
-        raise RuntimeError(f"Could not extract post ID from URL: {current_url}")
-
-    post_id = post_id_match.group(1)
-    activity.logger.info(f"Extracted post ID: {post_id}")
-
-    # Fetch post data with Async PRAW
-    activity.logger.info("Fetching post details with Async PRAW...")
+    # Use PRAW to search for open requests (more reliable than UI search)
+    activity.logger.info("Searching for open requests via PRAW API...")
     async with asyncpraw.Reddit(
         client_id=REDDIT_CLIENT_ID,
         client_secret=REDDIT_CLIENT_SECRET,
@@ -178,18 +136,50 @@ async def get_reddit_request(page) -> Optional[Dict]:
         password=REDDIT_PASSWORD,
         user_agent=REDDIT_USER_AGENT,
     ) as reddit:
-        post = await reddit.submission(id=post_id)
+        subreddit = await reddit.subreddit(SUBREDDIT_NAME)
+
+        # Search for posts with "Open request" flair, sorted by top, all time
+        # This matches the UI search: flair:"Open request", sort=top, t=all
+        search_results = subreddit.search(
+            'flair:"Open request"',
+            sort='top',
+            time_filter='all',
+            limit=1
+        )
+
+        # Get the first result (highest upvoted open request)
+        post = None
+        async for submission in search_results:
+            post = submission
+            break
+
+        if post is None:
+            activity.logger.info("No open requests found on r/ClaudeDraws")
+            return None
+
+        # Extract post data from PRAW submission
+        activity.logger.info(f"Found open request: {post.title}")
         author = post.author
         author_name = author.name if author else '[deleted]'
 
-        # Get image URLs
+        # Get image URLs from the post
         image_urls = await get_image_urls_from_post(post)
+
+        # Construct post URL and extract ID
+        post_url = f"https://www.reddit.com{post.permalink}"
+        post_id = post.id
 
         activity.logger.info(f"Request from u/{author_name}: {post.title}")
 
+        # Navigate to the post in Chrome so livestream viewers can see it
+        activity.logger.info(f"Navigating to post: {post_url}")
+        await page.goto(post_url)
+        await page.wait_for_load_state('domcontentloaded')
+        await page.wait_for_timeout(5000)
+
         return {
             "post_id": post_id,
-            "post_url": current_url,
+            "post_url": post_url,
             "post_title": post.title,
             "author_name": author_name,
             "post_body": post.selftext if post.selftext else None,
