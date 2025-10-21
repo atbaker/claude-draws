@@ -1,5 +1,6 @@
 """Temporal activities for Claude Draws artwork processing."""
 
+import asyncio
 import base64
 import json
 import os
@@ -643,30 +644,44 @@ async def rebuild_static_site() -> None:
     """
     Rebuild the SvelteKit static site using npm.
 
-    Runs `npm run build` in the gallery directory.
+    Runs `npm run build` in the gallery directory asynchronously.
     """
     activity.logger.info("Rebuilding static site...")
 
     try:
-        result = subprocess.run(
-            ["npm", "run", "build"],
+        # Use async subprocess to avoid blocking the event loop
+        process = await asyncio.create_subprocess_exec(
+            "npm", "run", "build",
             cwd=str(GALLERY_DIR),
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=60,  # 1 minute timeout
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
 
-        activity.logger.info("✓ Build completed successfully")
-        activity.logger.debug(f"Build output: {result.stdout}")
+        # Wait for process to complete with timeout
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60.0  # 1 minute timeout
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            activity.logger.error("✗ Build timed out after 1 minute")
+            raise
 
-    except subprocess.CalledProcessError as e:
-        activity.logger.error(f"✗ Build failed with exit code {e.returncode}")
-        activity.logger.error(f"stdout: {e.stdout}")
-        activity.logger.error(f"stderr: {e.stderr}")
-        raise
-    except subprocess.TimeoutExpired:
-        activity.logger.error("✗ Build timed out after 1 minute")
+        # Check return code
+        if process.returncode != 0:
+            activity.logger.error(f"✗ Build failed with exit code {process.returncode}")
+            activity.logger.error(f"stdout: {stdout.decode()}")
+            activity.logger.error(f"stderr: {stderr.decode()}")
+            raise RuntimeError(f"Build failed with exit code {process.returncode}")
+
+        activity.logger.info("✓ Build completed successfully")
+        activity.logger.debug(f"Build output: {stdout.decode()}")
+
+    except Exception as e:
+        if not isinstance(e, (asyncio.TimeoutError, RuntimeError)):
+            activity.logger.error(f"✗ Unexpected error during build: {e}")
         raise
 
 
@@ -675,7 +690,7 @@ async def deploy_to_cloudflare() -> str:
     """
     Deploy the built site to Cloudflare Workers using wrangler.
 
-    Runs `wrangler deploy` in the gallery directory.
+    Runs `wrangler deploy` in the gallery directory asynchronously.
 
     Returns:
         Gallery URL (e.g., https://claudedraws.com)
@@ -683,29 +698,43 @@ async def deploy_to_cloudflare() -> str:
     activity.logger.info("Deploying to Cloudflare Workers...")
 
     try:
-        result = subprocess.run(
-            ["npx", "wrangler", "deploy"],
+        # Use async subprocess to avoid blocking the event loop
+        process = await asyncio.create_subprocess_exec(
+            "npx", "wrangler", "deploy",
             cwd=str(GALLERY_DIR),
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=60,  # 1 minute timeout
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
 
+        # Wait for process to complete with timeout
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60.0  # 1 minute timeout
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            activity.logger.error("✗ Deployment timed out after 1 minute")
+            raise
+
+        # Check return code
+        if process.returncode != 0:
+            activity.logger.error(f"✗ Deployment failed with exit code {process.returncode}")
+            activity.logger.error(f"stdout: {stdout.decode()}")
+            activity.logger.error(f"stderr: {stderr.decode()}")
+            raise RuntimeError(f"Deployment failed with exit code {process.returncode}")
+
         activity.logger.info("✓ Deployment completed successfully")
-        activity.logger.debug(f"Deploy output: {result.stdout}")
+        activity.logger.debug(f"Deploy output: {stdout.decode()}")
 
         # Return the gallery URL (customize based on your domain)
         gallery_url = "https://claudedraws.com"
         return gallery_url
 
-    except subprocess.CalledProcessError as e:
-        activity.logger.error(f"✗ Deployment failed with exit code {e.returncode}")
-        activity.logger.error(f"stdout: {e.stdout}")
-        activity.logger.error(f"stderr: {e.stderr}")
-        raise
-    except subprocess.TimeoutExpired:
-        activity.logger.error("✗ Deployment timed out after 1 minute")
+    except Exception as e:
+        if not isinstance(e, (asyncio.TimeoutError, RuntimeError)):
+            activity.logger.error(f"✗ Unexpected error during deployment: {e}")
         raise
 
 
@@ -934,6 +963,43 @@ async def cleanup_tab_activity(cdp_url: str, tab_url: str) -> None:
             activity.logger.info("✓ Tab closed")
         else:
             activity.logger.warning(f"⚠ Could not find tab at {tab_url} to close")
+
+
+@activity.defn
+async def start_gallery_deployment_workflow(artwork_id: str) -> None:
+    """
+    Start a standalone gallery deployment workflow.
+
+    This activity starts an independent DeployGalleryWorkflow that runs
+    in parallel with the main CreateArtworkWorkflow, allowing the parent
+    to continue with other activities (like posting Reddit comments) while
+    the gallery builds and deploys in the background.
+
+    Args:
+        artwork_id: ID of the artwork being deployed
+    """
+    activity.logger.info(f"Starting gallery deployment workflow for {artwork_id}...")
+
+    try:
+        # Get Temporal client
+        client = await Client.connect(TEMPORAL_HOST)
+
+        # Start independent workflow
+        workflow_id = f"deploy-gallery-{artwork_id}"
+
+        await client.start_workflow(
+            "DeployGalleryWorkflow",
+            args=[artwork_id],
+            id=workflow_id,
+            task_queue=TASK_QUEUE,
+        )
+
+        activity.logger.info(f"✓ Started gallery deployment workflow: {workflow_id}")
+
+    except Exception as e:
+        activity.logger.error(f"✗ Error starting gallery deployment workflow: {e}")
+        # Re-raise to trigger Temporal retry
+        raise
 
 
 @activity.defn

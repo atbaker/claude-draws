@@ -15,11 +15,13 @@ load_dotenv()
 from workflows.activities import (
     append_to_gallery_metadata,
     browser_session_activity,
+    cleanup_tab_activity,
     deploy_to_cloudflare,
     extract_artwork_metadata,
     post_reddit_comment_activity,
     rebuild_static_site,
     schedule_next_workflow,
+    start_gallery_deployment_workflow,
     upload_image_to_r2,
     upload_metadata_to_r2,
 )
@@ -51,15 +53,18 @@ async def main():
         workflows=[CreateArtworkWorkflow, DeployGalleryWorkflow],
         activities=[
             browser_session_activity,
+            cleanup_tab_activity,
             extract_artwork_metadata,
             upload_image_to_r2,
             upload_metadata_to_r2,
             append_to_gallery_metadata,
+            start_gallery_deployment_workflow,
             rebuild_static_site,
             deploy_to_cloudflare,
             post_reddit_comment_activity,
             schedule_next_workflow,
         ],
+        max_concurrent_activities=4,
     )
 
     # Run worker
