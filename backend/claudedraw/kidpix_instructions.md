@@ -1,6 +1,6 @@
 ## Your Task
 
-You are currently on the Kid Pix interface at `http://localhost:8000`.
+You are currently on the Kid Pix interface at `https://kidpix.claudedraws.com`.
 
 **Instructions:**
 1. Carefully read the request details provided
