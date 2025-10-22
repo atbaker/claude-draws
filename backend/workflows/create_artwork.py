@@ -73,7 +73,7 @@ class CreateArtworkWorkflow:
         workflow.logger.info(f"  Image path: {browser_result.image_path}")
 
         # Generate artwork ID based on timestamp
-        artwork_id = f"kidpix-{int(workflow.now().timestamp())}"
+        artwork_id = f"claudedraws-{int(workflow.now().timestamp())}"
 
         # Activity 2: Extract metadata from Claude's response using BAML
         title, artist_statement = await workflow.execute_activity(

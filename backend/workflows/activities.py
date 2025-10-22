@@ -468,7 +468,7 @@ async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
 
             # Write to container's downloads directory
             timestamp = int(time.time())
-            download_path = downloads_dir / f"kidpix-{timestamp}.png"
+            download_path = downloads_dir / f"claudedraws-{timestamp}.png"
             with open(download_path, 'wb') as f:
                 f.write(image_bytes)
             activity.logger.info(f"Artwork saved to: {download_path}")
