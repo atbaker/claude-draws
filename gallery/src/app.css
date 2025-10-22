@@ -1,7 +1,68 @@
 @import "tailwindcss";
 
-.pixelated {
-	image-rendering: pixelated;
+/* ChicagoFLF Font - Classic Macintosh System Font */
+@font-face {
+	font-family: 'ChicagoFLF';
+	src: url('/fonts/ChicagoFLF.ttf') format('truetype');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@theme {
+	/* Kid Pix Color Palette */
+	--color-kidpix-red: #FF0000;
+	--color-kidpix-blue: #0000FF;
+	--color-kidpix-yellow: #FFFF00;
+	--color-kidpix-green: #00FF00;
+	--color-kidpix-orange: #FF9D07;
+	--color-kidpix-purple: #882FF6;
+	--color-kidpix-pink: #FF69B4;
+	--color-kidpix-cyan: #00FFFF;
+
+	/* Chunky Box Shadows */
+	--shadow-chunky: 4px 4px 0px #000000;
+	--shadow-chunky-lg: 8px 8px 0px #000000;
+	--shadow-chunky-hover: 2px 2px 0px #000000;
+
+	/* Override default sans-serif font with ChicagoFLF */
+	--font-sans: "ChicagoFLF", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* Pixelated image rendering */
+.pixelated,
+img,
+canvas {
 	image-rendering: -moz-crisp-edges;
+	image-rendering: -webkit-crisp-edges;
+	image-rendering: pixelated;
 	image-rendering: crisp-edges;
+}
+
+/* Kid Pix Animations */
+@keyframes wiggle {
+	0%, 100% { transform: rotate(-3deg); }
+	50% { transform: rotate(3deg); }
+}
+
+@keyframes stamp-drop {
+	0% {
+		transform: scale(0) rotate(-45deg);
+		opacity: 0;
+	}
+	50% {
+		transform: scale(1.2) rotate(5deg);
+	}
+	100% {
+		transform: scale(1) rotate(0deg);
+		opacity: 1;
+	}
+}
+
+.animate-wiggle {
+	animation: wiggle 0.5s ease-in-out;
+}
+
+.animate-stamp {
+	animation: stamp-drop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
