@@ -29,7 +29,6 @@ services:
       - ./downloads:/app/downloads
       - /app/backend/.venv
       - /app/gallery/node_modules
-      - ./gallery/src/lib/gallery-metadata.json:/app/gallery/src/lib/gallery-metadata.json
     working_dir: /app/backend
     command: uv run python -m worker.main
 

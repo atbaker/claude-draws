@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import os
+import shutil
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
@@ -612,11 +613,17 @@ async def append_to_gallery_metadata(artwork_id: str, image_url: str, metadata: 
     # Ensure directory exists
     GALLERY_METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    # Handle case where a directory exists at the file path
+    if GALLERY_METADATA_PATH.exists() and GALLERY_METADATA_PATH.is_dir():
+        activity.logger.warning(f"Directory exists at {GALLERY_METADATA_PATH}, removing it")
+        shutil.rmtree(GALLERY_METADATA_PATH)
+
     # Load existing gallery metadata or create new
-    if GALLERY_METADATA_PATH.exists():
+    if GALLERY_METADATA_PATH.is_file():
         with open(GALLERY_METADATA_PATH, "r") as f:
             gallery_metadata = json.load(f)
     else:
+        activity.logger.info("No existing gallery metadata file, creating new one")
         gallery_metadata = {"artworks": [], "lastUpdated": None}
 
     # Check if artwork already exists
@@ -884,6 +891,10 @@ async def post_reddit_comment_activity(
             await comment_element.wait_for(state="attached", timeout=10000)
             comment_id = await comment_element.get_attribute('thingid')
             activity.logger.info(f"Found comment ID: {comment_id}")
+
+            # Wait a few seconds to avoid a race condition with Reddit's own
+            # comment post-processing
+            await page.wait_for_timeout(2000)
 
             # Use Async PRAW to approve and sticky the comment
             activity.logger.info("Approving and stickying comment via Async PRAW...")
