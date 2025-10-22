@@ -66,3 +66,45 @@ canvas {
 .animate-stamp {
 	animation: stamp-drop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
+
+/* Inline link styling for prose content */
+/* Only applies to <a> tags without Tailwind classes (to avoid styling buttons) */
+a:not([class*="bg-"]):not([class*="border-"]) {
+	color: var(--color-kidpix-blue);
+	text-decoration: underline;
+	font-weight: bold;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 2px;
+}
+
+a:not([class*="bg-"]):not([class*="border-"]):hover {
+	color: var(--color-kidpix-purple);
+	text-decoration-thickness: 3px;
+}
+
+/* Footer link styling (white on dark background) */
+/* Higher specificity to override the general inline link styling */
+.footer-links a:not([class*="bg-"]):not([class*="border-"]) {
+	color: white;
+	text-decoration: underline;
+	font-weight: bold;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 2px;
+}
+
+.footer-links a:not([class*="bg-"]):not([class*="border-"]):hover {
+	color: var(--color-kidpix-yellow);
+	text-decoration-thickness: 3px;
+}
+
+/* Diagonal stripe background pattern - subtle 90s/Kid Pix texture */
+body {
+	background-image:
+		repeating-linear-gradient(
+			45deg,
+			#FFFFFF 0px,
+			#FFFFFF 10px,
+			#F0F0F0 10px,
+			#F0F0F0 20px
+		);
+}
