@@ -7,8 +7,6 @@ directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
 
 # Custom domain configuration
-# After deployment, configure the domain in the Cloudflare dashboard
-# or add route configuration here:
-# routes = [
-#   { pattern = "claudedraws.com", custom_domain = true }
-# ]
+[[routes]]
+pattern = "claudedraws.com"
+custom_domain = true
