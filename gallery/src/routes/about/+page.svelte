@@ -72,7 +72,7 @@
 						Hi, I'm <a href="https://andrewtorkbaker.com/">Andrew</a>. I'm a software engineer.
 					</p>
 					<p>
-						I first posed the question above in <a href="https://implausible.ai/blog/the-state-of-browser-ai-agents/">a newsletter I write about AI</a>. That issue was all about browser agents - AI that uses websites like you and I do. It's a topic that's getting increased attention these days. Just about every big AI lab now has a browser agent project, and there are new ones all the time. OpenAI released their <a href="https://openai.com/index/introducing-chatgpt-atlas/">ChatGPT Atlas</a> browser just a few days ago!
+						I first posed that question in <a href="https://implausible.ai/blog/the-state-of-browser-ai-agents/">a newsletter I write about AI</a>. That issue was all about browser agents - AI that uses websites like you and I do. It's a topic that's getting increased attention these days. Just about every big AI lab now has a browser agent project, and there are new ones all the time. OpenAI released their <a href="https://openai.com/index/introducing-chatgpt-atlas/">ChatGPT Atlas</a> browser just a few days ago!
 					</p>
 					<p>
 						Nobody calls the internet "the information superhighway" today. I mentioned it in my newsletter as a throwaway joke. But it got me thinking about my own early experiences with computers and the internet in the 1990s. And when I think about those special afternoons in my school's computer lab, one piece of software made a bigger impact on me than any other: Kid Pix.
