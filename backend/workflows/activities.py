@@ -111,6 +111,26 @@ async def get_image_urls_from_post(post):
     return urls
 
 
+async def visit_gallery(page) -> None:
+    """
+    Navigate to the Claude Draws gallery for livestream viewers.
+
+    Shows the gallery website briefly so viewers can see the completed artworks
+    and decide to visit in their own browser.
+
+    Args:
+        page: Playwright page object
+    """
+    activity.logger.info("Navigating to Claude Draws gallery...")
+    await page.goto('https://claudedraws.com')
+    await page.wait_for_load_state('domcontentloaded')
+
+    # Show gallery for 5 seconds
+    activity.logger.info("Displaying gallery for 5 seconds...")
+    await page.wait_for_timeout(5000)
+    activity.logger.info("✓ Gallery visit complete")
+
+
 async def get_reddit_request(page) -> Optional[Dict]:
     """
     Navigate to r/ClaudeDraws and find an open request using PRAW search.
@@ -359,6 +379,9 @@ async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
         activity.logger.info("Created new tab for this workflow run")
 
         try:
+            # Visit gallery first for livestream viewers
+            await visit_gallery(page)
+
             # Try to get a Reddit request
             reddit_request = await get_reddit_request(page)
 
