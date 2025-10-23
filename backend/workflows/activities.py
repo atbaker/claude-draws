@@ -166,8 +166,8 @@ async def get_reddit_request(page) -> Optional[Dict]:
         # This helps work around Reddit's search cache by checking multiple results
         search_results = subreddit.search(
             'flair:"Open request"',
-            sort='top',
-            time_filter='all',
+            sort='new',
+            # time_filter='all', # TODO: Re-enable if there are more than a few posts in the queue
         )
 
         # Iterate through search results and re-fetch each to get fresh flair data
