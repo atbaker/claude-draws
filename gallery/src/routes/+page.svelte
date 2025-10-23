@@ -54,7 +54,7 @@
 		</div>
 
 		<!-- Description Section -->
-		<div class="max-w-3xl mx-auto mb-8">
+		<div class="max-w-4xl mx-auto mb-8">
 			<div class="bg-kidpix-yellow border-4 border-black p-6 shadow-chunky-lg">
 				<p class="text-lg sm:text-xl font-bold text-center leading-relaxed">
 					Watch Claude for Chrome create Kid Pix art from your Reddit requests.
@@ -84,7 +84,13 @@
 				href="/about"
 				class="bg-kidpix-red text-white font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
 			>
-				About this project
+				About
+			</a>
+			<a
+				href="#faqs"
+				class="bg-kidpix-green text-black font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
+			>
+				FAQ
 			</a>
 		</div>
 
@@ -117,6 +123,270 @@
 					</a>
 				</div>
 			{/if}
+		</div>
+
+		<!-- FAQ Section -->
+		<div id="faqs" class="mb-8">
+			<div class="bg-kidpix-orange border-4 border-black p-4 shadow-chunky-lg mb-6">
+				<h2 class="text-3xl font-black uppercase text-center">Frequently Asked Questions</h2>
+			</div>
+
+			<div class="max-w-4xl mx-auto space-y-4">
+				<!-- FAQ 1: How do I submit my idea -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						How do I submit my idea for Claude Draws to work on?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							I created a special subreddit just for this purpose: <a
+								href="https://www.reddit.com/r/ClaudeDraws/">r/ClaudeDraws</a
+							>.
+						</p>
+						<p>
+							Create a new post there describing your design and don't forget to add the "Open
+							request" flair to your post. Claude Draws checks the subreddit for unfulfilled
+							requests every 5-7 minutes. It then starts work on the open request with the most
+							upvotes. You can watch Claude Draws work on the livestream at the top of this page.
+						</p>
+						<p>
+							When Claude Draws is done, it will add a comment to your post with its finished
+							artwork. So don't worry if the queue is backed up - you don't have to watch the
+							livestream to catch your finished artwork.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 2: Who built this -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						Who built this?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Hi, I'm <a href="https://andrewtorkbaker.com/">Andrew</a>. I'm a software engineer
+							and in the 1990s I was a kid who loved Kid Pix. You can learn more about me and
+							this project on the <a href="/about">about page</a>.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 3: Is this affiliated with Anthropic -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						Is this project affiliated with Anthropic?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							No. These days I'm a solo engineer and I built this project as part of my
+							exploration of AI browser agents.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 4: How to get Claude for Chrome access -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						How can I get access to Claude for Chrome?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							I joined the waitlist when Anthropic first announced Claude for Chrome and got
+							access a couple weeks ago as a Claude Max subscriber.
+						</p>
+						<p>
+							<a
+								href="https://support.claude.com/en/articles/12012173-getting-started-with-claude-for-chrome#h_eaecc16aba"
+								>Check out this doc</a
+							> on Anthropic's site for up to date instructions on how to get access yourself.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 5: Kid Pix looks different -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						Wait… this Kid Pix looks a little different than I remember!
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Good eye! Vikrum's Kid Pix implementation is pretty faithful to the original - <a
+								href="https://kidpix.app/">you can use it here</a
+							>. I <a href="https://github.com/atbaker/kidpix/">forked that repo</a> and made a few
+							changes to help Claude (and other browser agents) use Kid Pix more easily.
+						</p>
+						<p>
+							Some of those changes were necessary because of Claude for Chrome's limitations.
+							For example: it can't emulate a "shift + click", necessary to create enlarged
+							versions of Kid Pix stamps. So I added a toggle it can use to hold down a virtual
+							"shift" key instead.
+						</p>
+						<p>
+							Other changes, though, just help Claude stay on track. Browser agents work best
+							when they can use a combination of screenshot and HTML data, and when that HTML data
+							has useful information included in each element. My fork adds a lot of little
+							details to the HTML to help Claude understand what will happen when it presses each
+							individual button.
+						</p>
+						<p>
+							Finally, I added a status bar so Claude and livestream viewers alike can more
+							easily see what tools and subtools are active at any given moment.
+						</p>
+						<p>
+							If you are a Kid Pix purist, you can find <a
+								href="https://archive.org/details/kid-pix-11">a full emulator loaded with v1.1</a
+							> on the Wayback Machine.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 6: Is this an art project -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						So, is this an art project?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Not really. When I think back to my days using Kid Pix, the finished artwork wasn't
+							really the most important part. In fact, it probably got blown up with the dynamite
+							tool a few times along the way!
+						</p>
+						<p>
+							To me, this project is more of an interactive educational demo you can use to learn
+							about how AI browser agents work. This type of AI is still in its early years, but
+							one day something like Claude for Chrome might be capable and reliable enough to
+							help you get things done.
+						</p>
+						<p>
+							That "thing" probably won't be "create a Kid Pix artwork." But I found it
+							interesting to explore AI browser agents via assessing their ability to use one of
+							the first pieces of software I encountered in my youth.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 7: Other browser agents -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						Have you tried it with ChatGPT Atlas or Gemini 2.5 Computer Use?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							I try just about every browser agent model and tool! This project, however, was not
+							about benchmarking. After all, there aren't a lot of websites out there that work
+							like Kid Pix.
+						</p>
+						<p>
+							I did briefly try out my custom prompt and Kid Pix UI with <a
+								href="https://openai.com/index/introducing-chatgpt-atlas/">ChatGPT Atlas</a
+							>
+							and
+							<a href="https://blog.google/technology/google-deepmind/gemini-computer-use-model/"
+								>Gemini 2.5 Computer Use</a
+							>. I got the best initial results with Claude for Chrome.
+						</p>
+						<p>
+							It also made financial sense to use Claude for Chrome for this project, since its
+							usage is included in my existing <a href="https://www.claude.com/pricing/max"
+								>Claude Max</a
+							> plan which I use with <a href="https://www.claude.com/product/claude-code">Claude Code</a>. As any engineer who has built browser
+							agents knows, there are a lot of tokens involved in processing all those screenshots
+							and HTML!
+						</p>
+						<p>
+							You can certainly try out my prompt and UI with your browser agent of choice,
+							however. Each entry in the Claude Draws gallery contains the original prompt passed
+							to Claude for Chrome. My custom fork of the Kid Pix UI is available at
+							<a href="https://kidpix.claudedraws.com">https://kidpix.claudedraws.com</a>.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 8: Open source -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						Is Claude Draws open source?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Yes, Claude Draws is open source under the MIT license. You can find the GitHub
+							repo <a href="https://github.com/atbaker/claude-draws">here</a>.
+						</p>
+						<p>
+							I don't recommend trying to set up the repo yourself just yet. The docs will get a
+							bit more love this weekend. If you're itching to try anyway, you're welcome to open
+							an issue if you get stuck.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 9: Tools used -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						What tools did you use to build this?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Anthropic's <a href="https://www.anthropic.com/news/claude-for-chrome">Claude for Chrome</a> browser extension does the heavy lifting here. Most
+							of the Claude Draws code is focused on sourcing requests from Reddit,
+							programmatically injecting prompts into the browser extension, and then
+							processing the newly created artwork before adding it to the gallery site.
+						</p>
+						<p>
+							I wrote most of that code in Python using Cursor and Claude Code. The other notable
+							tools in this project are <a href="https://github.com/microsoft/playwright-python"
+								>Playwright</a
+							>, <a href="https://github.com/temporalio/temporal">Temporal</a>, and
+							<a href="https://github.com/boundaryml/baml">BAML</a>. The gallery site runs on Cloudflare and Claude Draws itself is currently deployed on a spare PC in my garage.
+						</p>
+					</div>
+				</details>
+			</div>
 		</div>
 	</main>
 
