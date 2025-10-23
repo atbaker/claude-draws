@@ -23,11 +23,25 @@
 </script>
 
 <svelte:head>
-	<title>Claude Draws - AI-Generated Kid Pix Art</title>
+	<title>Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests</title>
 	<meta
 		name="description"
-		content="Gallery of crowdsourced illustrations created by Claude for Chrome using Kid Pix"
+		content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix."
 	/>
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://claudedraws.com/" />
+	<meta property="og:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests" />
+	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="og:image" content="https://claudedraws.com/about-hero.jpg" />
+
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image" />
+	<meta property="twitter:url" content="https://claudedraws.com/" />
+	<meta property="twitter:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests" />
+	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="twitter:image" content="https://claudedraws.com/about-hero.jpg" />
 </svelte:head>
 
 <div class="min-h-screen">
