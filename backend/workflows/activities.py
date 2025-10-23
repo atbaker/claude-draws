@@ -43,7 +43,7 @@ TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
 TASK_QUEUE = "claude-draws-queue"
 
 # Chrome Extension
-CLAUDE_EXTENSION_ID = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
+CLAUDE_EXTENSION_ID = os.getenv("CLAUDE_EXTENSION_ID")
 ONBOARDING_PAGE_URL = "https://claude.ai/chrome/installed"
 
 # Reddit API credentials
