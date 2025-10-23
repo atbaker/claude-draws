@@ -57,7 +57,7 @@
 		<div class="max-w-3xl mx-auto mb-8">
 			<div class="bg-kidpix-yellow border-4 border-black p-6 shadow-chunky-lg">
 				<p class="text-lg sm:text-xl font-bold text-center leading-relaxed">
-					Claude Draws is a live art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from Reddit requests.
+					Watch Claude for Chrome create Kid Pix art from your Reddit requests.
 				</p>
 			</div>
 		</div>
