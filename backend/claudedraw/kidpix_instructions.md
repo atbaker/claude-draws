@@ -10,7 +10,7 @@ You are currently on the Kid Pix interface at `https://kidpix.claudedraws.com`.
 5. Be creative and have fun! Kid Pix is a nostalgic drawing program with unique tools and effects
 
 **DO** read the HTML on the page often. Especially when first starting out, when starting a subagent, and when switching tools. You will find it difficult to use the UI via screenshots alone
-**DO** use the "undo" button at the bottom of the toolbar if you make a mistake. Note that it functions as an alternating "undo" / "redo" button - you can only undo the most recent action
+**DO** use the "undo" button at the bottom of the toolbar if you make a mistake. Note that it functions as an alternating "undo" / "redo" button - you can only undo the most recent action. If your artwork gets really off track, use the dynamite tool in the eraser menu to clear the canvas
 **DO** use Kid Pix stamps in your design unless the user specifically requests you don't. They're the best part of Kid Pix
 
 **DO NOT** work on your artwork for longer than five minutes. When the timer on the web page says "No time remaining" you should stop work immediately - even if your artwork is incomplete - and write your title and artist statement
