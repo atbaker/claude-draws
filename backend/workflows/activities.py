@@ -439,7 +439,7 @@ async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
 
             # Wait for Claude to finish with heartbeats
             activity.logger.info("Claude is working... (sending heartbeats)")
-            timeout_ms = 10 * 60 * 1000  # 10 minutes
+            timeout_ms = 12 * 60 * 1000  # 12 minutes max
             start_time = time.time()
 
             while True:
@@ -455,7 +455,7 @@ async def browser_session_activity(cdp_url: str) -> BrowserSessionResult:
                 # Check timeout
                 elapsed_ms = (time.time() - start_time) * 1000
                 if elapsed_ms > timeout_ms:
-                    raise TimeoutError("Claude did not finish within 10 minutes")
+                    raise TimeoutError("Claude did not finish within 12 minutes")
 
                 # Wait before next check
                 await page.wait_for_timeout(1000)  # Check every second

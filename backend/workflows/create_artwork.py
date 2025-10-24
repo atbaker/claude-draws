@@ -61,7 +61,7 @@ class CreateArtworkWorkflow:
             browser_session_activity,
             args=[cdp_url],
             start_to_close_timeout=timedelta(minutes=15),  # Long timeout for drawing
-            heartbeat_timeout=timedelta(minutes=2),  # Expect heartbeats every 2 min
+            heartbeat_timeout=timedelta(seconds=30),  # Expect heartbeats every 30 seconds
             retry_policy=RetryPolicy(
                 maximum_attempts=2,  # Only retry once for browser automation
                 backoff_coefficient=2.0,

@@ -165,7 +165,7 @@
 						<p>
 							Create a new post there describing your design and don't forget to add the "Open
 							request" flair to your post. Claude Draws checks the subreddit for unfulfilled
-							requests every 5-7 minutes. It then starts work on the open request with the most
+							requests every 5-10 minutes. It then starts work on the open request with the most
 							upvotes. You can watch Claude Draws work on the livestream at the top of this page.
 						</p>
 						<p>
