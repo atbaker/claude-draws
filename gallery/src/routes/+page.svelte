@@ -49,6 +49,15 @@
 
 	<!-- Main Content -->
 	<main class="container mx-auto p-4 sm:p-8">
+		<!-- Hiatus Notice -->
+		<div class="max-w-4xl mx-auto mb-8">
+			<div class="bg-kidpix-red border-4 border-black p-6 shadow-chunky-lg">
+				<p class="text-lg text-white sm:text-xl font-bold text-center leading-relaxed">
+					Claude Draws will resume next week
+				</p>
+			</div>
+		</div>
+
 		<!-- Livestream Section -->
 		<div class="max-w-4xl mx-auto mb-8">
 			<div class="bg-kidpix-purple border-4 border-black shadow-chunky-lg overflow-hidden">
