@@ -199,6 +199,16 @@ cd gallery
 npm install
 ```
 
+**Configure local environment variables**:
+```bash
+# Copy the example file
+cp .dev.vars.example .dev.vars
+
+# Edit .dev.vars and add your API keys
+# RESEND_API_KEY=your_resend_api_key_here
+# ADMIN_NOTIFICATION_EMAIL=admin@example.com
+```
+
 **Run dev server**:
 ```bash
 npm run dev
@@ -213,6 +223,20 @@ npm run build
 ```bash
 wrangler deploy
 ```
+
+**Configure environment variables for Cloudflare Workers**:
+```bash
+cd gallery
+# Set Resend API key (required for admin notifications)
+wrangler secret put RESEND_API_KEY
+# Enter your Resend API key when prompted
+
+# Set admin notification email
+wrangler secret put ADMIN_NOTIFICATION_EMAIL
+# Enter your admin email address when prompted
+```
+
+Alternatively, configure via [Cloudflare Dashboard](https://dash.cloudflare.com) → Workers & Pages → Your Worker → Settings → Variables and Secrets.
 
 ### BAML Development
 
@@ -239,8 +263,12 @@ uv run baml-cli generate
   - `D1_DATABASE_ID` - D1 database ID
   - `RESEND_API_KEY` - Resend API key for email notifications
   - `RESEND_FROM_EMAIL` - From email address for notifications
+  - `ADMIN_NOTIFICATION_EMAIL` - Admin email address for submission notifications
   - `TEMPORAL_HOST` - Temporal server address (default: `localhost:7233`)
   - `CHROME_CDP_URL` - Chrome DevTools Protocol WebSocket URL (get from `http://localhost:9222/json`)
+- **Cloudflare Workers environment variables**: The gallery submission API requires these environment variables in Cloudflare Workers (configure via `wrangler secret put` or Cloudflare dashboard):
+  - `RESEND_API_KEY` - Resend API key (same as backend)
+  - `ADMIN_NOTIFICATION_EMAIL` - Admin email address (same as backend)
 - **Docker Compose**: Temporal server and worker must be running for the full workflow to complete
 
 ## Troubleshooting

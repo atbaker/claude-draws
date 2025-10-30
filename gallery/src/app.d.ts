@@ -10,6 +10,8 @@ declare global {
 			env: {
 				DB: D1Database;
 				R2_BUCKET: R2Bucket;
+				RESEND_API_KEY: string;
+				ADMIN_NOTIFICATION_EMAIL: string;
 			};
 		}
 	}

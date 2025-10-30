@@ -449,7 +449,9 @@ async def browser_session_activity(cdp_url: str, submission_id: Optional[str] = 
                 f.write(image_bytes)
             activity.logger.info(f"Artwork saved to: {download_path}")
 
-            # Close side panel
+            # Close side panel (after a moment for the livestream viewers to read
+            # the title and artist statement)
+            await page.wait_for_timeout(4000)
             await side_panel_page.close()
 
             # Store the tab URL for reconnection (should be https://kidpix.claudedraws.com for Kid Pix)

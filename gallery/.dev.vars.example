@@ -1,0 +1,9 @@
+# Local development environment variables for Cloudflare Workers
+# Copy this file to .dev.vars and fill in your actual values
+# .dev.vars is gitignored and will be used by `npm run dev`
+
+# Resend API key for email notifications
+RESEND_API_KEY=your_resend_api_key_here
+
+# Admin email address for submission notifications
+ADMIN_NOTIFICATION_EMAIL=admin@example.com

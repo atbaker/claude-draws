@@ -64,6 +64,43 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			return json({ error: 'Failed to save submission' }, { status: 500 });
 		}
 
+		// Send admin notification email (don't fail submission if this fails)
+		try {
+			const adminEmail = platform.env.ADMIN_NOTIFICATION_EMAIL;
+			const resendApiKey = platform.env.RESEND_API_KEY;
+
+			if (adminEmail && resendApiKey) {
+				await fetch('https://api.resend.com/emails', {
+					method: 'POST',
+					headers: {
+						'Authorization': `Bearer ${resendApiKey}`,
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						from: 'Claude Draws <noreply@notifications.claudedraws.com>',
+						to: [adminEmail],
+						subject: 'New Claude Draws Submission',
+						html: `
+							<html>
+								<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+									<h2 style="color: #882FF6;">New Submission Received</h2>
+									<p><strong>Submission ID:</strong> ${submissionId}</p>
+									<p><strong>Created:</strong> ${new Date(createdAt).toLocaleString()}</p>
+									<p><strong>User Email:</strong> ${email || 'Not provided'}</p>
+									<p><strong>Prompt:</strong></p>
+									<pre style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word;">${prompt}</pre>
+								</body>
+							</html>
+						`
+					})
+				});
+				console.log(`Admin notification sent for submission ${submissionId}`);
+			}
+		} catch (error) {
+			console.error('Failed to send admin notification:', error);
+			// Don't fail the submission if notification fails
+		}
+
 		return json({
 			success: true,
 			submissionId,
