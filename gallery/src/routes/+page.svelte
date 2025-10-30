@@ -64,13 +64,9 @@
 			<div class="bg-kidpix-purple border-4 border-black shadow-chunky-lg overflow-hidden">
 				<div class="aspect-video bg-black">
 					<iframe
+						src="https://player.twitch.tv/?channel=claudedraws&parent=claudedraws.com&parent=localhost&autoplay=true&muted=false"
 						width="100%"
 						height="100%"
-						src="https://www.youtube.com/embed/EdFn8sV-7Eg?si=cfVFZ2iZ-L_-gNb0"
-						title="YouTube video player"
-						frameborder="0"
-						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-						referrerpolicy="strict-origin-when-cross-origin"
 						allowfullscreen
 					></iframe>
 				</div>
