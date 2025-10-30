@@ -5,8 +5,6 @@
 	import ArtworkCard from '$lib/components/ArtworkCard.svelte';
 	import QueuePreview from '$lib/components/QueuePreview.svelte';
 
-	export const prerender = false;
-
 	let { data }: { data: PageData } = $props();
 
 	// Cycle through Kid Pix colors for cards

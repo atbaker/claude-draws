@@ -1,8 +1,8 @@
 import galleryMetadata from '$lib/gallery-metadata.json';
 import type { PageLoad } from './$types';
 
-// Prerender this page at build time
-export const prerender = true;
+// Disable prerendering to allow runtime queue fetching
+export const prerender = false;
 
 export const load: PageLoad = () => {
 	return {
