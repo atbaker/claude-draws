@@ -10,6 +10,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from workflows.activities import (
         check_for_pending_submissions,
+        start_check_submissions_workflow,
         switch_obs_scene,
         update_countdown_text,
         visit_gallery_activity,
@@ -111,16 +112,13 @@ class CheckSubmissionsWorkflow:
             if continuous:
                 workflow.logger.info("Continuous mode: starting new CheckSubmissionsWorkflow...")
 
-                # Start new check workflow as child
-                new_check_workflow_id = f"check-submissions-{int(workflow.now().timestamp())}"
-
-                # Properly await the start to fix RuntimeWarning
-                # We get the handle but don't wait for the workflow to complete
-                await workflow.start_child_workflow(
-                    "CheckSubmissionsWorkflow",
+                # Start new check workflow as a top-level workflow (not a child)
+                # This avoids race conditions that occur when parent completes immediately after starting child
+                new_check_workflow_id = await workflow.execute_activity(
+                    start_check_submissions_workflow,
                     args=[cdp_url, continuous],
-                    id=new_check_workflow_id,
-                    task_queue="claude-draws-queue",
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
                 )
 
                 workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
@@ -167,14 +165,14 @@ class CheckSubmissionsWorkflow:
 
                 # Start a new CheckSubmissionsWorkflow to check again
                 workflow.logger.info("Starting new CheckSubmissionsWorkflow...")
-                new_check_workflow_id = f"check-submissions-{int(workflow.now().timestamp())}"
 
-                # Properly await the start to fix RuntimeWarning
-                await workflow.start_child_workflow(
-                    "CheckSubmissionsWorkflow",
+                # Start new check workflow as a top-level workflow (not a child)
+                # This avoids race conditions that occur when parent completes immediately after starting child
+                new_check_workflow_id = await workflow.execute_activity(
+                    start_check_submissions_workflow,
                     args=[cdp_url, continuous],
-                    id=new_check_workflow_id,
-                    task_queue="claude-draws-queue",
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
                 )
 
                 workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
