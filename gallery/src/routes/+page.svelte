@@ -23,24 +23,24 @@
 </script>
 
 <svelte:head>
-	<title>Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests</title>
+	<title>Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests</title>
 	<meta
 		name="description"
-		content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix."
+		content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix."
 	/>
 
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://claudedraws.com/" />
-	<meta property="og:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests" />
-	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="og:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
+	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix." />
 	<meta property="og:image" content="https://claudedraws.com/about-hero.jpg" />
 
 	<!-- Twitter -->
 	<meta property="twitter:card" content="summary_large_image" />
 	<meta property="twitter:url" content="https://claudedraws.com/" />
-	<meta property="twitter:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your Reddit requests" />
-	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on r/ClaudeDraws and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="twitter:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
+	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix." />
 	<meta property="twitter:image" content="https://claudedraws.com/about-hero.jpg" />
 </svelte:head>
 
@@ -80,7 +80,7 @@
 		<div class="max-w-4xl mx-auto mb-8">
 			<div class="bg-kidpix-yellow border-4 border-black p-6 shadow-chunky-lg">
 				<p class="text-lg sm:text-xl font-bold text-center leading-relaxed">
-					Watch Claude for Chrome create Kid Pix art from your Reddit requests.
+					Watch Claude for Chrome create Kid Pix art from your requests.
 				</p>
 			</div>
 		</div>
@@ -88,12 +88,10 @@
 		<!-- Action Buttons -->
 		<div class="flex flex-wrap justify-center gap-4 mb-12">
 			<a
-				href="https://reddit.com/r/ClaudeDraws"
-				target="_blank"
-				rel="noopener noreferrer"
+				href="/submit"
 				class="bg-kidpix-blue text-white font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
 			>
-				Subreddit
+				Submit your request
 			</a>
 			<a
 				href="https://github.com/atbaker/claude-draws"
@@ -167,20 +165,13 @@
 					</summary>
 					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
 						<p>
-							I created a special subreddit just for this purpose: <a
-								href="https://www.reddit.com/r/ClaudeDraws/">r/ClaudeDraws</a
-							>.
+							Just head over to the <a href="/submit">submission form</a> and describe your artwork idea in as much detail as you'd like!
 						</p>
 						<p>
-							Create a new post there describing your design and don't forget to add the "Open
-							request" flair to your post. Claude Draws checks the subreddit for unfulfilled
-							requests every 5-10 minutes. It then starts work on the open request with the most
-							upvotes. You can watch Claude Draws work on the livestream at the top of this page.
+							Claude Draws processes submissions in the order they're received. You can watch Claude Draws work on the livestream at the top of this page. And if you'd like to be notified when your artwork is ready, just include your email address in the form - it's completely optional.
 						</p>
 						<p>
-							When Claude Draws is done, it will add a comment to your post with its finished
-							artwork. So don't worry if the queue is backed up - you don't have to watch the
-							livestream to catch your finished artwork.
+							So don't worry if the queue is backed up - you don't have to watch the livestream to catch your finished artwork. If you provided an email, you'll get a notification when it's done. Otherwise, you can check back in the gallery to see your completed creation!
 						</p>
 					</div>
 				</details>
@@ -396,7 +387,7 @@
 					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
 						<p>
 							Anthropic's <a href="https://www.anthropic.com/news/claude-for-chrome">Claude for Chrome</a> browser extension does the heavy lifting here. Most
-							of the Claude Draws code is focused on sourcing requests from Reddit,
+							of the Claude Draws code is focused on accepting requests via the submission form,
 							programmatically injecting prompts into the browser extension, and then
 							processing the newly created artwork before adding it to the gallery site.
 						</p>

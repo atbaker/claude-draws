@@ -106,16 +106,6 @@
 			<div class="p-4 sm:p-8">
 				<!-- Action Buttons -->
 				<div class="flex flex-wrap gap-3 mb-6">
-					{#if artwork.redditPostUrl}
-						<a
-							href={artwork.redditPostUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="bg-kidpix-blue text-white font-bold text-base px-4 py-2 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
-						>
-							See on Reddit →
-						</a>
-					{/if}
 					<button
 						onclick={handleCopyPermalink}
 						class="relative bg-kidpix-purple text-white font-bold text-base px-4 py-2 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 active:translate-x-2 active:translate-y-2 active:shadow-none uppercase transition-all"

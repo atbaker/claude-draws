@@ -109,11 +109,11 @@ async def start_workflow(cdp_url: str, continuous: bool):
         # Start workflow
         click.echo(f"Starting workflow: {workflow_id}")
         click.echo("This workflow will:")
-        click.echo("  1. Find an open request on r/ClaudeDraws")
+        click.echo("  1. Find pending submission from form")
         click.echo("  2. Submit prompt to Claude for Chrome")
         click.echo("  3. Wait for Claude to complete the artwork")
         click.echo("  4. Process and upload to gallery")
-        click.echo("  5. Post comment on Reddit with result")
+        click.echo("  5. Send email notification to requester")
         if continuous:
             click.echo("  6. Schedule next workflow run (continuous mode)")
         click.echo()

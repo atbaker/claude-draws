@@ -17,7 +17,7 @@ function ExtractArtworkMetadata(response_html: string) -> ArtworkMetadata {
   client DeterministicSonnet45
   prompt #"
     You are parsing HTML from a Claude for Chrome response where Claude just finished creating
-    artwork in Kid Pix based on a Reddit user's request.
+    artwork in Kid Pix based on a user's prompt submission.
 
     The HTML is from the final message Claude sent after completing the artwork.
     Your task is to extract two pieces of information:

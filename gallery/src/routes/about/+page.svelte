@@ -102,13 +102,13 @@
 						- Think up a drawing you would like Claude Draws to illustrate for you using Kid Pix
 					</p>
 					<p>
-						- Go to the <a href="https://www.reddit.com/r/ClaudeDraws/">r/ClaudeDraws</a> subreddit and create a new post describing your design. Don't forget to use the "Open request" flair on your new post!
+						- Head over to the <a href="/submit">submission form</a> and describe your design in as much detail as you'd like. You can also optionally include your email address to get notified when it's done!
 					</p>
 					<p>
 						- Open up the livestream and watch Claude Draws get to work on your design
 					</p>
 					<p>
-						Claude Draws works through the queue of outstanding requests in descending order of the post's upvote count. So depending on the length of the queue, it might take a while for Claude Draws to get to your submission. But don't worry, you don't need to watch the livestream 24/7 to see your artwork - Claude Draws will leave a comment on your Reddit post when it finishes.
+						Claude Draws works through the queue of submissions in the order they're received. So depending on the length of the queue, it might take a while for Claude Draws to get to your submission. But don't worry, you don't need to watch the livestream 24/7 to see your artwork - if you included your email, Claude Draws will send you a notification when it finishes. Otherwise, you can check back in the gallery!
 					</p>
 					<p>
 						You can find me online on <a href="https://x.com/andrewtorkbaker">Twitter</a> and <a href="https://www.linkedin.com/in/andrewtorkbaker/">LinkedIn</a>. You can subscribe to my newsletter about AI <a href="https://implausible.ai/blog/">here</a>. I'm planning to author a more detailed technical post about this project sometime soon.

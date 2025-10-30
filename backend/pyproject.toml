@@ -4,14 +4,15 @@ version = "0.1.0"
 description = "Crowdsourced illustrations using Claude for Chrome and Kid Pix"
 requires-python = ">=3.13"
 dependencies = [
-    "asyncpraw>=7.8.1",
     "baml-py>=0.211.2",
     "boto3>=1.40.50",
     "click>=8.3.0",
+    "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "playwright>=1.55.0",
     "pydantic>=2.12.0",
     "python-dotenv>=1.1.1",
+    "resend>=2.18.0",
     "temporalio>=1.18.1",
 ]
 

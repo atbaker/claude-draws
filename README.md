@@ -1,20 +1,20 @@
 # Claude Draws
 
-An automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from Reddit requests.
+An automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.com.
 
 ![Claude Draws creating a beach scene in Kid Pix](claude-draws-screenshot.png)
 
 🎨 **Live Gallery**: [claudedraws.com](https://claudedraws.com)
-💬 **Request Art**: [r/ClaudeDraws](https://reddit.com/r/ClaudeDraws)
+💬 **Request Art**: [claudedraws.com/submit](https://claudedraws.com/submit)
 
 ## What is Claude Draws?
 
 Claude Draws is a fully automated art pipeline that:
 
-1. **Monitors Reddit** - Watches r/ClaudeDraws for art requests from the community
+1. **Accepts Submissions** - Users submit art requests via the web form at claudedraws.com/submit
 2. **Creates Art** - Uses browser automation to have Claude for Chrome draw in Kid Pix (a nostalgic 90s paint program)
 3. **Processes & Publishes** - Automatically extracts metadata, uploads to cloud storage, rebuilds and deploys the gallery website
-4. **Shares Back** - Posts the finished artwork URL back to Reddit
+4. **Notifies Users** - Sends email notifications when artworks are complete (if email provided)
 
 The entire process runs autonomously - from request to published artwork - with no manual intervention required.
 
@@ -23,10 +23,11 @@ The entire process runs autonomously - from request to published artwork - with 
 ### The Pipeline
 
 ```
-Reddit Request → Browser Automation → Claude Draws in Kid Pix →
-  → Temporal Workflow → BAML Metadata Extraction →
-  → Cloudflare R2 Storage → Gallery Site Rebuild →
-  → Cloudflare Workers Deployment → Reddit Comment
+Web Form Submission → Cloudflare D1 Database → Browser Automation →
+  → Claude Draws in Kid Pix → Temporal Workflow →
+  → BAML Metadata Extraction → Cloudflare R2 Storage →
+  → Gallery Site Rebuild → Cloudflare Workers Deployment →
+  → Email Notification (optional)
 ```
 
 ### Technology Stack
@@ -81,10 +82,11 @@ For now, see [CLAUDE.md](CLAUDE.md) for detailed technical documentation and dev
 
 ## How to Request Art
 
-1. Visit [r/ClaudeDraws](https://reddit.com/r/ClaudeDraws)
-2. Submit a post with your art request
-3. Wait for Claude to create your artwork
-4. Receive a comment with a link to your finished piece on [claudedraws.com](https://claudedraws.com)
+1. Visit [claudedraws.com/submit](https://claudedraws.com/submit)
+2. Describe your artwork idea in the submission form
+3. Optionally include your email to get notified when it's ready
+4. Watch the livestream or wait for your email notification
+5. View your finished piece on [claudedraws.com](https://claudedraws.com)
 
 ## Gallery
 
@@ -94,7 +96,7 @@ Each artwork includes:
 - The finished Kid Pix illustration
 - Claude's title for the piece
 - Claude's artist statement explaining the creative choices
-- A link back to the original Reddit request
+- The original user prompt
 
 ## Architecture Highlights
 
@@ -109,8 +111,6 @@ BAML (Bounded Automation Markup Language) reliably parses Claude's unstructured 
 
 ### Static Site Generation
 SvelteKit pre-renders all pages at build time for maximum performance. No runtime database queries or API calls needed.
-
-For detailed architecture documentation, see [docs/gallery-architecture.md](docs/gallery-architecture.md).
 
 ## License
 

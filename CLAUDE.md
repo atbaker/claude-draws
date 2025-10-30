@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from Reddit requests. The complete workflow:
+**Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.com. The complete workflow:
 
-1. **Python CLI** (`backend/claudedraw/`) monitors r/ClaudeDraws for art requests
+1. **Web form** (claudedraws.com/submit) accepts art requests and stores them in Cloudflare D1
 2. **Browser automation** (Playwright + CDP) submits prompts to Claude for Chrome extension
 3. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
 4. **Temporal workflows** orchestrate the post-processing pipeline
@@ -51,25 +51,25 @@ claude-draws/
 
 The workflow handles the **complete end-to-end process**:
 
-1. **Browser automation** - Finds Reddit request, submits to Claude, waits for completion
+1. **Browser automation** - Finds pending submission from D1, submits to Claude, waits for completion
 2. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
 3. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket
 4. **Uploads metadata to R2** - Stores JSON metadata file alongside image
 5. **Appends to gallery metadata** - Updates local `gallery/src/lib/gallery-metadata.json` (gitignored)
 6. **Rebuilds static site** - Runs `npm run build` in gallery directory
 7. **Deploys to Cloudflare Workers** - Runs `wrangler deploy` to push updates live
-8. **Posts Reddit comment** - Shares completed artwork with requester
+8. **Sends email notification** - Notifies requester when artwork is ready (if email provided)
 9. **Schedules next workflow** (continuous mode only) - Enables livestream operation
 
 **Key activities** in `backend/workflows/activities.py`:
-- `browser_session_activity()` - Long-running activity that automates the browser (find request → submit → wait → download)
+- `browser_session_activity()` - Long-running activity that automates the browser (find submission → submit → wait → download)
 - `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
 - `upload_image_to_r2()` - Uploads PNG to R2 with public access
 - `upload_metadata_to_r2()` - Uploads JSON metadata to R2
 - `append_to_gallery_metadata()` - Updates local gallery metadata file
 - `rebuild_static_site()` - Runs npm build
 - `deploy_to_cloudflare()` - Deploys via wrangler
-- `post_reddit_comment_activity()` - Posts comment, approves/stickies it, updates flair
+- `send_email_notification()` - Sends completion email to requester (if email provided)
 - `schedule_next_workflow()` - Schedules next workflow run (continuous mode)
 
 **Browser Automation Details** (implemented in `browser_session_activity()`):
@@ -127,21 +127,11 @@ This avoids fragile regex parsing and handles variations in Claude's response fo
 4. No runtime database queries - everything is pre-rendered
 
 **Routes**:
-- `/` - Gallery grid showing all artworks
+- `/` - Home page with livestream and gallery preview
+- `/gallery` - Full gallery grid showing all artworks
 - `/artwork/[id]` - Individual artwork detail page
-
-### Reddit Integration
-
-The workflow automatically:
-1. Navigates to r/ClaudeDraws
-2. Finds the first "Open" request
-3. Extracts the request details (author, title, body, reference images)
-4. Creates the artwork based on the request
-5. Posts a comment with the completed artwork
-6. Approves and stickies the comment
-7. Updates the post flair to "Completed"
-
-All Reddit interaction is handled within the Temporal workflow activities, providing automatic retries and visibility.
+- `/submit` - Submission form for art requests
+- `/about` - About page explaining the project
 
 ## Development Commands
 
@@ -244,11 +234,11 @@ uv run baml-cli generate
   - `R2_SECRET_ACCESS_KEY` - R2 API secret key
   - `R2_BUCKET_NAME` - R2 bucket name (e.g., `claudedraws-dev`)
   - `R2_PUBLIC_URL` - Public R2 URL (e.g., `https://r2.claudedraws.com`)
-  - `REDDIT_CLIENT_ID` - Reddit API client ID
-  - `REDDIT_CLIENT_SECRET` - Reddit API client secret
-  - `REDDIT_USERNAME` - Reddit username
-  - `REDDIT_PASSWORD` - Reddit password
-  - `REDDIT_USER_AGENT` - Reddit user agent string
+  - `D1_API_TOKEN` - Cloudflare API token for D1 database access
+  - `D1_ACCOUNT_ID` - Cloudflare account ID for D1
+  - `D1_DATABASE_ID` - D1 database ID
+  - `RESEND_API_KEY` - Resend API key for email notifications
+  - `RESEND_FROM_EMAIL` - From email address for notifications
   - `TEMPORAL_HOST` - Temporal server address (default: `localhost:7233`)
   - `CHROME_CDP_URL` - Chrome DevTools Protocol WebSocket URL (get from `http://localhost:9222/json`)
 - **Docker Compose**: Temporal server and worker must be running for the full workflow to complete
