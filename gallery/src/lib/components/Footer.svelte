@@ -4,6 +4,14 @@
 			Submit Request
 		</a>
 		<span class="text-kidpix-yellow">•</span>
+		<a href="/queue">
+			View Queue
+		</a>
+		<span class="text-kidpix-yellow">•</span>
+		<a href="/about">
+			About
+		</a>
+		<span class="text-kidpix-yellow">•</span>
 		<a
 			href="https://github.com/atbaker/claude-draws"
 			target="_blank"

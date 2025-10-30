@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 
@@ -31,9 +32,14 @@
 				throw new Error(result.error || 'Failed to submit request');
 			}
 
-			submitSuccess = true;
-			prompt = '';
-			email = '';
+			// Redirect to queue page with submission highlighted
+			if (result.submissionId) {
+				await goto(`/queue?highlight=${result.submissionId}`);
+			} else {
+				submitSuccess = true;
+				prompt = '';
+				email = '';
+			}
 
 		} catch (error) {
 			submitError = error instanceof Error ? error.message : 'An error occurred';

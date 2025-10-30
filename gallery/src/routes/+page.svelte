@@ -3,6 +3,9 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import ArtworkCard from '$lib/components/ArtworkCard.svelte';
+	import QueuePreview from '$lib/components/QueuePreview.svelte';
+
+	export const prerender = false;
 
 	let { data }: { data: PageData } = $props();
 
@@ -113,6 +116,11 @@
 			>
 				FAQ
 			</a>
+		</div>
+
+		<!-- Queue Preview Section -->
+		<div class="max-w-4xl mx-auto mb-12">
+			<QueuePreview />
 		</div>
 
 		<!-- Recent Artworks Section -->
