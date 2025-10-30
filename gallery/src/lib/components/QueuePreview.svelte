@@ -47,8 +47,8 @@
 		<p class="text-center font-bold text-lg text-red-700">Failed to load queue</p>
 	{:else if submissions.length === 0}
 		<div class="text-center py-4">
-			<p class="text-lg font-bold mb-4">Queue is empty!</p>
-			<p class="font-bold">Be the first to submit a request.</p>
+			<p class="text-lg font-bold mb-4">The queue is empty!</p>
+			<p class="font-bold"><a href="/submit" class="underline hover:text-kidpix-purple">Submit your request</a> and Claude Draws will get started right away.</p>
 		</div>
 	{:else}
 		<div class="space-y-3">

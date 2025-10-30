@@ -12,7 +12,6 @@ with workflow.unsafe.imports_passed_through():
         browser_session_activity,
         cleanup_tab_activity,
         extract_artwork_metadata,
-        schedule_next_workflow,
         send_email_notification,
         start_gallery_deployment_workflow,
         update_submission_status,
@@ -38,20 +37,23 @@ class CreateArtworkWorkflow:
     8. Updates submission status to "completed"
     9. Starts standalone gallery deployment workflow (runs independently)
     10. Sends email notification (if email provided)
-    11. Optionally schedules the next workflow (for continuous mode)
 
     Note: Gallery deployment (step 9) runs as an independent workflow to
     avoid blocking the main workflow.
 
+    Note: Continuous mode scheduling is handled by CheckSubmissionsWorkflow.
+    This workflow no longer schedules the next workflow run.
+
     Args:
         cdp_url: Chrome DevTools Protocol endpoint URL
-        continuous: If True, schedule another workflow run after completion
+        continuous: Deprecated parameter, no longer used (kept for backward compatibility)
         submission_id: Optional submission ID to process (if provided by CheckSubmissionsWorkflow)
 
     Returns:
         dict: Dictionary containing:
             - artwork_url: Gallery URL where the artwork can be viewed
             - submission_id: ID of the form submission that was fulfilled (if any)
+            - artwork_id: ID of the created artwork
     """
 
     @workflow.run
@@ -202,20 +204,6 @@ class CreateArtworkWorkflow:
             ),
         )
         workflow.logger.info("✓ Tab cleaned up")
-
-        # Activity 8: Schedule next workflow if continuous mode
-        if continuous:
-            workflow.logger.info("Continuous mode: scheduling next workflow...")
-            await workflow.execute_activity(
-                schedule_next_workflow,
-                args=[cdp_url, continuous],
-                start_to_close_timeout=timedelta(minutes=2),
-                retry_policy=RetryPolicy(
-                    maximum_attempts=3,
-                    backoff_coefficient=2.0,
-                ),
-            )
-            workflow.logger.info("✓ Next workflow scheduled")
 
         # Return result
         workflow.logger.info(f"✓ Workflow complete: {artwork_url}")

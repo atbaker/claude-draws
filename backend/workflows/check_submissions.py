@@ -21,133 +21,124 @@ class CheckSubmissionsWorkflow:
     """
     Workflow for checking submissions and managing OBS scenes.
 
-    This workflow implements the waiting/screensaver functionality:
-    1. Switches to screensaver scene
+    This workflow performs a single check cycle:
+    1. Switches to main scene and shows gallery
     2. Checks for pending submissions
-    3. If found: Switches to main scene and starts CreateArtworkWorkflow
-    4. If not found: Displays 60-second countdown, then repeats
-    5. Loops indefinitely until a submission is found
+    3. If found: Starts CreateArtworkWorkflow and waits for completion
+    4. If not found (continuous mode): Displays 60-second countdown
+    5. In continuous mode: Starts a new CheckSubmissionsWorkflow before returning
 
-    This workflow is designed to run continuously, creating a dynamic
-    livestream experience with countdown timers between artworks.
+    This workflow is designed for workflow chaining in continuous mode,
+    creating a dynamic livestream experience with countdown timers between artworks.
+    Each check cycle gets its own workflow execution for better observability.
 
     Args:
         cdp_url: Chrome DevTools Protocol endpoint URL
-        continuous: Whether to continue with continuous mode after artwork creation
+        continuous: Whether to start a new CheckSubmissionsWorkflow after this execution
 
     Returns:
         dict: Dictionary containing:
-            - submission_id: ID of the submission that was found
-            - artwork_workflow_id: ID of the CreateArtworkWorkflow that was started
+            - submission_id: ID of the submission that was found (if any)
+            - artwork_workflow_id: ID of the CreateArtworkWorkflow that was started (if submission found)
+            - artwork_url: URL of the artwork (if submission found)
     """
 
     @workflow.run
     async def run(self, cdp_url: str, continuous: bool = False) -> dict:
         workflow.logger.info("Starting CheckSubmissionsWorkflow")
         workflow.logger.info(f"CDP URL: {cdp_url}")
+        workflow.logger.info(f"Continuous mode: {continuous}")
 
         # Import here to avoid circular dependency issues
         with workflow.unsafe.imports_passed_through():
             from workflows.activities import OBS_MAIN_SCENE, OBS_SCREENSAVER_SCENE
 
-        # Loop indefinitely until we find a submission
-        loop_count = 0
-        while True:
-            loop_count += 1
-            workflow.logger.info(f"Submission check loop #{loop_count}")
+        # Switch to main scene and show gallery
+        await workflow.execute_activity(
+            switch_obs_scene,
+            args=[OBS_MAIN_SCENE],
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        workflow.logger.info(f"✓ Switched to main scene: {OBS_MAIN_SCENE}")
 
-            # Switch to main scene and show gallery at the start of each check
-            await workflow.execute_activity(
-                switch_obs_scene,
-                args=[OBS_MAIN_SCENE],
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=RetryPolicy(maximum_attempts=3),
+        # Visit gallery homepage for 5 seconds (shows on livestream)
+        await workflow.execute_activity(
+            visit_gallery_activity,
+            args=[cdp_url],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        workflow.logger.info("✓ Gallery homepage displayed")
+
+        # Check for pending submissions
+        submission = await workflow.execute_activity(
+            check_for_pending_submissions,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+
+        if submission:
+            # Found a submission!
+            workflow.logger.info(f"✓ Found submission: {submission['id']}")
+
+            # Start CreateArtworkWorkflow
+            workflow.logger.info("Starting CreateArtworkWorkflow...")
+
+            # Generate workflow ID
+            timestamp = int(workflow.now().timestamp())
+            artwork_workflow_id = f"claude-draws-{timestamp}"
+
+            # Start child workflow for artwork creation
+            # Pass the submission ID so CreateArtworkWorkflow knows which submission to process
+            # Note: We pass continuous=False to CreateArtworkWorkflow since CheckSubmissionsWorkflow
+            # handles the continuous mode logic
+            artwork_result = await workflow.execute_child_workflow(
+                "CreateArtworkWorkflow",
+                args=[cdp_url, False, submission["id"]],
+                id=artwork_workflow_id,
+                task_queue="claude-draws-queue",
+                retry_policy=RetryPolicy(
+                    maximum_attempts=0 if continuous else 3,  # Infinite retries in continuous mode
+                    backoff_coefficient=2.0,
+                ),
             )
-            workflow.logger.info(f"✓ Switched to main scene: {OBS_MAIN_SCENE}")
 
-            # Visit gallery homepage for 5 seconds (shows on livestream)
-            await workflow.execute_activity(
-                visit_gallery_activity,
-                args=[cdp_url],
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            workflow.logger.info("✓ Gallery homepage displayed")
+            workflow.logger.info(f"✓ CreateArtworkWorkflow completed: {artwork_workflow_id}")
+            workflow.logger.info(f"  Artwork URL: {artwork_result['artwork_url']}")
 
-            # Check for pending submissions
-            submission = await workflow.execute_activity(
-                check_for_pending_submissions,
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
+            # If continuous mode, start a new CheckSubmissionsWorkflow
+            if continuous:
+                workflow.logger.info("Continuous mode: starting new CheckSubmissionsWorkflow...")
 
-            if submission:
-                # Found a submission!
-                workflow.logger.info(f"✓ Found submission: {submission['id']}")
+                # Start new check workflow as child
+                new_check_workflow_id = f"check-submissions-{int(workflow.now().timestamp())}"
 
-                # Start CreateArtworkWorkflow
-                workflow.logger.info("Starting CreateArtworkWorkflow...")
-
-                # Import Client here to start the artwork workflow
-                with workflow.unsafe.imports_passed_through():
-                    from temporalio.client import Client
-                    import time
-
-                # We need to use an activity to start the next workflow
-                # Create a new activity for this purpose
-                with workflow.unsafe.imports_passed_through():
-                    from workflows.activities import TEMPORAL_HOST, TASK_QUEUE
-
-                # Generate workflow ID
-                timestamp = int(workflow.now().timestamp())
-                artwork_workflow_id = f"claude-draws-{timestamp}"
-
-                # Start the artwork workflow using execute_local_activity
-                # Actually, we should create an activity for this - let me use a child workflow instead
-
-                # Start child workflow for artwork creation
-                # Pass the submission ID so CreateArtworkWorkflow knows which submission to process
-                artwork_result = await workflow.execute_child_workflow(
-                    "CreateArtworkWorkflow",
-                    args=[cdp_url, continuous, submission["id"]],
-                    id=artwork_workflow_id,
+                # Properly await the start to fix RuntimeWarning
+                # We get the handle but don't wait for the workflow to complete
+                await workflow.start_child_workflow(
+                    "CheckSubmissionsWorkflow",
+                    args=[cdp_url, continuous],
+                    id=new_check_workflow_id,
                     task_queue="claude-draws-queue",
-                    retry_policy=RetryPolicy(
-                        maximum_attempts=0 if continuous else 3,  # Infinite retries in continuous mode
-                        backoff_coefficient=2.0,
-                    ),
                 )
 
-                workflow.logger.info(f"✓ CreateArtworkWorkflow completed: {artwork_workflow_id}")
-                workflow.logger.info(f"  Artwork URL: {artwork_result['artwork_url']}")
+                workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
 
-                # If continuous mode, start a new CheckSubmissionsWorkflow
-                if continuous:
-                    workflow.logger.info("Continuous mode: starting new CheckSubmissionsWorkflow...")
+            # Return result
+            return {
+                "submission_id": submission["id"],
+                "artwork_workflow_id": artwork_workflow_id,
+                "artwork_url": artwork_result["artwork_url"],
+            }
 
-                    # Start new check workflow as child
-                    new_check_workflow_id = f"check-submissions-{int(workflow.now().timestamp())}"
+        else:
+            # No submission found
+            workflow.logger.info("No submissions found")
 
-                    # Don't await - let it run independently
-                    workflow.start_child_workflow(
-                        "CheckSubmissionsWorkflow",
-                        args=[cdp_url, continuous],
-                        id=new_check_workflow_id,
-                        task_queue="claude-draws-queue",
-                    )
-
-                    workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
-
-                # Return result
-                return {
-                    "submission_id": submission["id"],
-                    "artwork_workflow_id": artwork_workflow_id,
-                    "artwork_url": artwork_result["artwork_url"],
-                }
-
-            else:
-                # No submission found - switch to screensaver and show countdown
-                workflow.logger.info("No submissions found, switching to screensaver...")
+            if continuous:
+                # In continuous mode: show screensaver countdown then schedule next check
+                workflow.logger.info("Switching to screensaver...")
 
                 # Switch to screensaver scene
                 await workflow.execute_activity(
@@ -172,4 +163,34 @@ class CheckSubmissionsWorkflow:
                     # Sleep for 1 second
                     await workflow.sleep(timedelta(seconds=1))
 
-                workflow.logger.info("✓ Countdown complete, checking for submissions again...")
+                workflow.logger.info("✓ Countdown complete")
+
+                # Start a new CheckSubmissionsWorkflow to check again
+                workflow.logger.info("Starting new CheckSubmissionsWorkflow...")
+                new_check_workflow_id = f"check-submissions-{int(workflow.now().timestamp())}"
+
+                # Properly await the start to fix RuntimeWarning
+                await workflow.start_child_workflow(
+                    "CheckSubmissionsWorkflow",
+                    args=[cdp_url, continuous],
+                    id=new_check_workflow_id,
+                    task_queue="claude-draws-queue",
+                )
+
+                workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
+
+                # Return with no submission found
+                return {
+                    "submission_id": None,
+                    "artwork_workflow_id": None,
+                    "artwork_url": None,
+                }
+
+            else:
+                # Not continuous mode: just return
+                workflow.logger.info("Not in continuous mode, workflow complete")
+                return {
+                    "submission_id": None,
+                    "artwork_workflow_id": None,
+                    "artwork_url": None,
+                }

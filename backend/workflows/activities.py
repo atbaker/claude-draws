@@ -901,53 +901,6 @@ async def start_gallery_deployment_workflow(artwork_id: str) -> None:
         raise
 
 
-@activity.defn
-async def schedule_next_workflow(cdp_url: str, continuous: bool) -> None:
-    """
-    Schedule the next workflow run for continuous operation.
-
-    This activity is only called when continuous=True, so we always apply
-    the infinite retry policy here.
-
-    Args:
-        cdp_url: Chrome DevTools Protocol URL to pass to next workflow
-        continuous: Whether to continue scheduling (should always be True when called)
-    """
-    activity.logger.info("Scheduling next workflow run...")
-
-    try:
-        # Get Temporal client
-        client = await Client.connect(TEMPORAL_HOST)
-
-        # Start new workflow
-        timestamp = int(time.time())
-        workflow_id = f"claude-draws-{timestamp}"
-
-        # Apply infinite retry policy for continuous mode
-        retry_policy = RetryPolicy(
-            initial_interval=timedelta(seconds=10),
-            maximum_interval=timedelta(minutes=3),
-            backoff_coefficient=2.0,
-            maximum_attempts=0,  # Infinite retries
-        )
-
-        await client.start_workflow(
-            "CreateArtworkWorkflow",
-            args=[cdp_url, continuous],
-            id=workflow_id,
-            task_queue=TASK_QUEUE,
-            retry_policy=retry_policy,
-        )
-
-        activity.logger.info(f"✓ Scheduled next workflow: {workflow_id}")
-
-    except Exception as e:
-        # Always try to schedule next run even if something fails
-        activity.logger.error(f"✗ Error scheduling next workflow: {e}")
-        # Re-raise to trigger Temporal retry
-        raise
-
-
 # ============================================================================
 # OBS Control Activities
 # ============================================================================
