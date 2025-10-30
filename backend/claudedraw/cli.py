@@ -62,7 +62,7 @@ def start(continuous: bool):
 
 async def cancel_existing_workflows(client: Client) -> int:
     """
-    Cancel all running CreateArtworkWorkflow instances.
+    Cancel all running CheckSubmissionsWorkflow and CreateArtworkWorkflow instances.
 
     This ensures only one workflow runs at a time during livestreams.
     Uses graceful cancellation (not termination) to allow cleanup.
@@ -73,20 +73,25 @@ async def cancel_existing_workflows(client: Client) -> int:
     Returns:
         Number of workflows cancelled
     """
-    query = "WorkflowType='CreateArtworkWorkflow' AND ExecutionStatus='Running'"
+    # Cancel both workflow types to ensure clean slate
+    queries = [
+        "WorkflowType='CheckSubmissionsWorkflow' AND ExecutionStatus='Running'",
+        "WorkflowType='CreateArtworkWorkflow' AND ExecutionStatus='Running'",
+    ]
 
     cancelled_count = 0
-    async for workflow_execution in client.list_workflows(query=query):
-        click.echo(f"  Cancelling workflow: {workflow_execution.id}")
-        handle = client.get_workflow_handle(workflow_execution.id)
-        await handle.cancel()
-        cancelled_count += 1
+    for query in queries:
+        async for workflow_execution in client.list_workflows(query=query):
+            click.echo(f"  Cancelling workflow: {workflow_execution.id}")
+            handle = client.get_workflow_handle(workflow_execution.id)
+            await handle.cancel()
+            cancelled_count += 1
 
     return cancelled_count
 
 
 async def start_workflow(cdp_url: str, continuous: bool):
-    """Connect to Temporal and start the CreateArtworkWorkflow."""
+    """Connect to Temporal and start the CheckSubmissionsWorkflow."""
     try:
         # Connect to Temporal
         click.echo("Connecting to Temporal server...")
@@ -104,21 +109,20 @@ async def start_workflow(cdp_url: str, continuous: bool):
 
         # Generate workflow ID
         timestamp = int(time.time())
-        workflow_id = f"claude-draws-{timestamp}"
+        workflow_id = f"check-submissions-{timestamp}"
 
         # Start workflow
         click.echo(f"Starting workflow: {workflow_id}")
         click.echo("This workflow will:")
-        click.echo("  1. Find pending submission from form")
-        click.echo("  2. Submit prompt to Claude for Chrome")
-        click.echo("  3. Wait for Claude to complete the artwork")
-        click.echo("  4. Process and upload to gallery")
-        click.echo("  5. Send email notification to requester")
+        click.echo("  1. Switch OBS to screensaver scene")
+        click.echo("  2. Check for pending submissions")
+        click.echo("  3. If found: Create artwork and deploy to gallery")
+        click.echo("  4. If not found: Display 60-second countdown and repeat")
         if continuous:
-            click.echo("  6. Schedule next workflow run (continuous mode)")
+            click.echo("  5. Loop indefinitely (continuous mode)")
         click.echo()
 
-        from workflows.create_artwork import CreateArtworkWorkflow
+        from workflows.check_submissions import CheckSubmissionsWorkflow
 
         # Configure retry policy based on continuous mode
         if continuous:
@@ -136,7 +140,7 @@ async def start_workflow(cdp_url: str, continuous: bool):
             retry_policy = None
 
         handle = await client.start_workflow(
-            CreateArtworkWorkflow.run,
+            CheckSubmissionsWorkflow.run,
             args=[cdp_url, continuous],
             id=workflow_id,
             task_queue=TASK_QUEUE,
