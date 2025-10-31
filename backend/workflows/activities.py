@@ -329,7 +329,7 @@ async def browser_session_activity(cdp_url: str, submission_id: Optional[str] = 
                     """
                     SELECT id, prompt, email, created_at
                     FROM submissions
-                    WHERE id = ? AND status = 'pending'
+                    WHERE id = ? AND status IN ('pending', 'processing')
                     LIMIT 1
                     """,
                     [submission_id]
@@ -346,7 +346,7 @@ async def browser_session_activity(cdp_url: str, submission_id: Optional[str] = 
                     }
                     activity.logger.info(f"✓ Found submission: {submission_id}")
                 else:
-                    activity.logger.warning(f"⚠ Submission {submission_id} not found or not pending")
+                    activity.logger.warning(f"⚠ Submission {submission_id} not found or not in processable state")
                     submission = None
             else:
                 # No specific submission - find next pending one
