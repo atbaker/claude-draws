@@ -9,12 +9,16 @@
 		prompt: string;
 		status: 'pending' | 'processing';
 		created_at: string;
+		upvote_count: number;
 	}
 
 	let submissions: Submission[] = [];
 	let isLoading = true;
 	let error = '';
 	let highlightId: string | null = null;
+	let expandedSubmissionId: string | null = null;
+	let upvotedSubmissions: string[] = [];
+	let mySubmissions: string[] = [];
 
 	function getRelativeTime(timestamp: string): string {
 		const now = new Date();
@@ -30,12 +34,87 @@
 		return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 	}
 
-	function truncatePrompt(prompt: string, maxLength: number = 50): string {
+	function truncatePrompt(prompt: string, maxLength: number = 200): string {
 		if (prompt.length <= maxLength) return prompt;
 		return prompt.substring(0, maxLength).trim() + '...';
 	}
 
+	function toggleExpand(submissionId: string) {
+		// If clicking the already-expanded one, collapse it
+		// Otherwise, expand this one (automatically collapsing any other)
+		expandedSubmissionId = expandedSubmissionId === submissionId ? null : submissionId;
+	}
+
+	function hasUpvoted(submissionId: string): boolean {
+		return upvotedSubmissions.includes(submissionId);
+	}
+
+	function isMySubmission(submissionId: string): boolean {
+		return mySubmissions.includes(submissionId);
+	}
+
+	function canUpvote(submissionId: string): boolean {
+		return !isMySubmission(submissionId);
+	}
+
+	async function handleUpvote(submission: Submission) {
+		const alreadyUpvoted = hasUpvoted(submission.id);
+		const increment = alreadyUpvoted ? -1 : 1;
+
+		try {
+			const response = await fetch('/api/upvote', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ submissionId: submission.id, increment })
+			});
+
+			const result = await response.json();
+
+			if (!response.ok) {
+				throw new Error(result.error || 'Failed to update upvote');
+			}
+
+			// Update local state and trigger Svelte reactivity
+			submissions = submissions.map(s =>
+				s.id === submission.id
+					? { ...s, upvote_count: result.upvoteCount }
+					: s
+			);
+
+			// Update upvoted list
+			if (alreadyUpvoted) {
+				upvotedSubmissions = upvotedSubmissions.filter(id => id !== submission.id);
+			} else {
+				upvotedSubmissions = [...upvotedSubmissions, submission.id];
+			}
+
+			// Save to localStorage
+			localStorage.setItem('upvotedSubmissions', JSON.stringify(upvotedSubmissions));
+		} catch (err) {
+			console.error('Error updating upvote:', err);
+		}
+	}
+
 	onMount(async () => {
+		// Load localStorage data
+		const storedUpvotes = localStorage.getItem('upvotedSubmissions');
+		if (storedUpvotes) {
+			try {
+				upvotedSubmissions = JSON.parse(storedUpvotes);
+			} catch (e) {
+				console.error('Failed to parse upvoted submissions:', e);
+			}
+		}
+
+		const storedMySubmissions = localStorage.getItem('mySubmissions');
+		if (storedMySubmissions) {
+			try {
+				mySubmissions = JSON.parse(storedMySubmissions);
+			} catch (e) {
+				console.error('Failed to parse my submissions:', e);
+			}
+		}
+
 		highlightId = $page.url.searchParams.get('highlight');
 
 		try {
@@ -100,7 +179,7 @@
 					Request Queue
 				</h1>
 				<p class="text-lg font-bold">
-					Claude Draws processes requests in order, from oldest to newest. <a href="/submit" class="underline hover:text-kidpix-purple">Submit your request here</a>.
+					Claude Draws processes the most-upvoted requests first. When submissions have the same number of upvotes, the oldest is processed first. <a href="/submit" class="underline hover:text-kidpix-purple">Submit your request here</a>.
 				</p>
 			</div>
 
@@ -143,37 +222,58 @@
 							id="submission-{submission.id}"
 							class="bg-white border-4 border-black p-6 shadow-chunky transition-all {highlightId === submission.id ? 'bg-kidpix-yellow animate-stamp' : ''}"
 						>
-							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-								<!-- Queue Position & Status -->
+							<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+								<!-- Left Side: Position, Status, Timestamp -->
 								<div class="flex items-center gap-4">
-									<div class="bg-kidpix-purple text-white font-black text-2xl px-4 py-2 border-4 border-black min-w-[4rem] text-center">
+									<div class="bg-kidpix-purple text-white font-black text-2xl px-4 py-2 border-4 border-black min-w-[4rem] text-center flex-shrink-0">
 										#{index + 1}
 									</div>
 									<div>
 										{#if submission.status === 'processing'}
-											<span class="inline-block bg-kidpix-green text-black font-black text-sm px-3 py-1 border-2 border-black uppercase">
+											<span class="inline-block bg-kidpix-green text-black font-black text-sm px-3 py-1 border-2 border-black uppercase mb-2">
 												Processing Now
 											</span>
 										{:else}
-											<span class="inline-block bg-gray-300 text-black font-black text-sm px-3 py-1 border-2 border-black uppercase">
+											<span class="inline-block bg-gray-300 text-black font-black text-sm px-3 py-1 border-2 border-black uppercase mb-2">
 												Pending
 											</span>
 										{/if}
+										<p class="text-sm font-bold text-gray-600 uppercase">
+											{getRelativeTime(submission.created_at)}
+										</p>
 									</div>
 								</div>
 
-								<!-- Timestamp -->
-								<div class="text-right">
-									<p class="text-sm font-bold text-gray-600 uppercase">
-										{getRelativeTime(submission.created_at)}
-									</p>
-								</div>
+								<!-- Upvote Button -->
+								<button
+									on:click={() => handleUpvote(submission)}
+									disabled={!canUpvote(submission.id)}
+									class="flex flex-col items-center gap-1 px-4 py-3 border-4 border-black flex-shrink-0 transition-all {hasUpvoted(submission.id)
+										? 'bg-kidpix-purple text-white'
+										: 'bg-white hover:bg-gray-100'} {!canUpvote(submission.id) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-chunky'}"
+									title={isMySubmission(submission.id) ? 'This is your submission' : hasUpvoted(submission.id) ? 'Click to remove upvote' : 'Click to upvote'}
+								>
+									<span class="text-2xl">▲</span>
+									<span class="text-sm font-black">{submission.upvote_count}</span>
+								</button>
 							</div>
 
-							<!-- Prompt Preview -->
+							<!-- Prompt -->
 							<div class="mt-4 pt-4 border-t-2 border-gray-300">
 								<p class="text-lg font-bold text-gray-800">
-									{truncatePrompt(submission.prompt)}
+									{#if expandedSubmissionId === submission.id}
+										{submission.prompt}
+									{:else}
+										{truncatePrompt(submission.prompt, 200)}
+									{/if}
+									{#if submission.prompt.length > 200}
+										<button
+											on:click={() => toggleExpand(submission.id)}
+											class="text-kidpix-purple hover:underline ml-1"
+										>
+											{expandedSubmissionId === submission.id ? 'see less' : 'see more'}
+										</button>
+									{/if}
 								</p>
 							</div>
 

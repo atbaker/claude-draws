@@ -48,15 +48,16 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		try {
 			await db
 				.prepare(
-					`INSERT INTO submissions (id, prompt, email, status, created_at)
-					VALUES (?, ?, ?, ?, ?)`
+					`INSERT INTO submissions (id, prompt, email, status, created_at, upvote_count)
+					VALUES (?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					submissionId,
 					prompt,
 					email,
 					'pending',
-					createdAt
+					createdAt,
+					1  // Every submission starts with 1 upvote (the submitter's)
 				)
 				.run();
 		} catch (error) {

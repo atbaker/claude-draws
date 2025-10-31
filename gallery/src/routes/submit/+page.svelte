@@ -32,8 +32,26 @@
 				throw new Error(result.error || 'Failed to submit request');
 			}
 
-			// Redirect to queue page with submission highlighted
+			// Store submission ID in localStorage
 			if (result.submissionId) {
+				const storedSubmissions = localStorage.getItem('mySubmissions');
+				let mySubmissions: string[] = [];
+
+				if (storedSubmissions) {
+					try {
+						mySubmissions = JSON.parse(storedSubmissions);
+					} catch (e) {
+						console.error('Failed to parse my submissions:', e);
+					}
+				}
+
+				// Add new submission ID if not already present
+				if (!mySubmissions.includes(result.submissionId)) {
+					mySubmissions.push(result.submissionId);
+					localStorage.setItem('mySubmissions', JSON.stringify(mySubmissions));
+				}
+
+				// Redirect to queue page with submission highlighted
 				await goto(`/queue?highlight=${result.submissionId}`);
 			} else {
 				submitSuccess = true;

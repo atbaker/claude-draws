@@ -161,9 +161,9 @@ async def get_next_submission(page) -> Optional[Dict]:
     activity.logger.info("Querying D1 for pending submissions...")
 
     try:
-        # Query D1 for pending submissions, ordered by created_at
+        # Query D1 for pending submissions, ordered by upvote_count DESC (most upvoted first), then created_at ASC (FIFO tiebreaker)
         result = await query_d1(
-            "SELECT id, prompt, email FROM submissions WHERE status = ? ORDER BY created_at ASC LIMIT 1",
+            "SELECT id, prompt, email FROM submissions WHERE status = ? ORDER BY upvote_count DESC, created_at ASC LIMIT 1",
             ["pending"]
         )
 
@@ -849,7 +849,7 @@ async def check_for_pending_submissions() -> Optional[Dict]:
             SELECT id, prompt, email, created_at
             FROM submissions
             WHERE status = 'pending'
-            ORDER BY created_at ASC
+            ORDER BY upvote_count DESC, created_at ASC
             LIMIT 1
             """
         )

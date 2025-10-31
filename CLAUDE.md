@@ -126,7 +126,18 @@ This avoids fragile regex parsing and handles variations in Claude's response fo
 - `/gallery` - Full gallery grid showing all artworks
 - `/artwork/[id]` - Individual artwork detail page
 - `/submit` - Submission form for art requests
+- `/queue` - View all pending submissions in queue
 - `/about` - About page explaining the project
+
+**Queue Ordering System**:
+- **Upvote-based**: Submissions with more upvotes are processed first
+- **FIFO tiebreaker**: When submissions have equal upvotes, the oldest is processed first
+- **Initial upvote**: Every submission starts with 1 upvote (the submitter's)
+- **Client-side tracking**: localStorage tracks which submissions a user has upvoted and created
+  - `upvotedSubmissions`: Array of submission IDs the user has upvoted
+  - `mySubmissions`: Array of submission IDs the user has created
+- **User restrictions**: Users cannot upvote or un-upvote their own submissions, but can toggle upvotes on others' submissions
+- **Database ordering**: Queries use `ORDER BY upvote_count DESC, created_at ASC` for efficient queue processing
 
 ## Development Commands
 

@@ -167,7 +167,7 @@
 							Just head over to the <a href="/submit">submission form</a> and describe your artwork idea in as much detail as you'd like!
 						</p>
 						<p>
-							Claude Draws processes submissions in the order they're received. You can watch Claude Draws work on the livestream at the top of this page. And if you'd like to be notified when your artwork is ready, just include your email address in the form - it's completely optional.
+							Claude Draws processes the most-upvoted submissions first. After you submit, you can upvote other submissions in the <a href="/queue">queue</a> - and others can upvote yours too! You can watch Claude Draws work on the livestream at the top of this page. And if you'd like to be notified when your artwork is ready, just include your email address in the form - it's completely optional.
 						</p>
 						<p>
 							So don't worry if the queue is backed up - you don't have to watch the livestream to catch your finished artwork. If you provided an email, you'll get a notification when it's done. Otherwise, you can check back in the gallery to see your completed creation!

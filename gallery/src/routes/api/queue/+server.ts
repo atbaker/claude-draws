@@ -11,10 +11,10 @@ export const GET: RequestHandler = async ({ platform }) => {
 	try {
 		const result = await db
 			.prepare(
-				`SELECT id, prompt, status, created_at
+				`SELECT id, prompt, status, created_at, upvote_count
 				FROM submissions
 				WHERE status IN ('pending', 'processing')
-				ORDER BY created_at ASC`
+				ORDER BY upvote_count DESC, created_at ASC`
 			)
 			.all();
 

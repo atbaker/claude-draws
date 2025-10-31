@@ -108,7 +108,7 @@
 						- Open up the livestream and watch Claude Draws get to work on your design
 					</p>
 					<p>
-						Claude Draws works through the queue of submissions in the order they're received. So depending on the length of the queue, it might take a while for Claude Draws to get to your submission. But don't worry, you don't need to watch the livestream 24/7 to see your artwork - if you included your email, Claude Draws will send you a notification when it finishes. Otherwise, you can check back in the gallery!
+						Claude Draws works through the queue by processing the most-upvoted submissions first. After you submit, you can check out the <a href="/queue">queue</a> to upvote other submissions - and others can upvote yours too! So depending on the length of the queue and how many upvotes your submission gets, it might take a while for Claude Draws to get to your submission. But don't worry, you don't need to watch the livestream 24/7 to see your artwork - if you included your email, Claude Draws will send you a notification when it finishes. Otherwise, you can check back in the gallery!
 					</p>
 					<p>
 						You can find me online on <a href="https://x.com/andrewtorkbaker">Twitter</a> and <a href="https://www.linkedin.com/in/andrewtorkbaker/">LinkedIn</a>. You can subscribe to my newsletter about AI <a href="https://implausible.ai/blog/">here</a>. I'm planning to author a more detailed technical post about this project sometime soon.
