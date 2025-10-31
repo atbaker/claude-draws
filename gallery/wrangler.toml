@@ -9,14 +9,14 @@ binding = "ASSETS"
 # D1 Database for form submissions
 [[d1_databases]]
 binding = "DB"
-database_name = "claudedraws-dev"
-database_id = "d1804ba1-e116-4139-8f5a-061e44881f0c"
+database_name = "claudedraws-prod"
+database_id = "72183c83-d7e4-4d67-b18f-75599d53f330"
 migrations_dir = "migrations"
 
 # R2 Bucket for reference images and artworks
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "claudedraws-dev"
+bucket_name = "claudedraws-prod"
 
 # Custom domain configuration
 [[routes]]
