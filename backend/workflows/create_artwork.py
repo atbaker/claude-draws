@@ -25,16 +25,13 @@ class CreateArtworkWorkflow:
     Workflow for creating artwork from form submissions.
 
     This workflow handles the entire end-to-end process:
-    1. Finds a pending form submission from D1 database
-    2. Updates submission status to "processing"
-    3. Submits prompt to Claude for Chrome
-    4. Waits for Claude to complete the artwork
-    5. Downloads the artwork image
-    6. Extracts metadata (title and artist statement)
-    7. Uploads image to R2
-    8. Inserts metadata into D1 artworks table
-    9. Updates submission status to "completed"
-    10. Sends email notification (if email provided)
+    1. Updates submission status to "processing" (if submission_id provided)
+    2. Browser session: finds pending submission, submits to Claude, waits, downloads
+    3. Extracts metadata (title and artist statement)
+    4. Uploads image to R2
+    5. Inserts metadata into D1 artworks table
+    6. Updates submission status to "completed"
+    7. Sends email notification (if email provided)
 
     Note: No build/deploy step required! Gallery pages fetch from D1 at runtime,
     so new artworks appear immediately without rebuilding the site.
@@ -59,6 +56,16 @@ class CreateArtworkWorkflow:
         workflow.logger.info(f"Starting CreateArtworkWorkflow (continuous={continuous}, submission_id={submission_id})")
         workflow.logger.info(f"CDP URL: {cdp_url}")
 
+        # Update submission status to "processing" if this is a form submission
+        if submission_id:
+            await workflow.execute_activity(
+                update_submission_status,
+                args=[submission_id, "processing"],
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            workflow.logger.info("✓ Updated submission status to 'processing'")
+
         # Activity 1: Browser session - find request, submit to Claude, wait, download
         browser_result: BrowserSessionResult = await workflow.execute_activity(
             browser_session_activity,
@@ -74,16 +81,6 @@ class CreateArtworkWorkflow:
         workflow.logger.info(f"✓ Browser session complete")
         workflow.logger.info(f"  Submission ID: {browser_result.submission_id}")
         workflow.logger.info(f"  Image path: {browser_result.image_path}")
-
-        # Update submission status to "processing" if this was a form submission
-        if browser_result.submission_id:
-            await workflow.execute_activity(
-                update_submission_status,
-                args=[browser_result.submission_id, "processing"],
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            workflow.logger.info("✓ Updated submission status to 'processing'")
 
         # Generate artwork ID based on timestamp
         artwork_id = f"claudedraws-{int(workflow.now().timestamp())}"
