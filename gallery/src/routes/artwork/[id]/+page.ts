@@ -1,25 +1,31 @@
-import galleryMetadata from '$lib/gallery-metadata.json';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-// Prerender all artwork pages at build time
-export const prerender = true;
+// Disable prerendering to allow runtime data fetching
+export const prerender = false;
 
-// Tell SvelteKit which artwork IDs to prerender
-export function entries() {
-	return galleryMetadata.artworks.map((artwork) => ({
-		id: artwork.id
-	}));
-}
+export const load: PageLoad = async ({ params, fetch }) => {
+	try {
+		const response = await fetch(`/api/artworks/${params.id}`);
 
-export const load: PageLoad = ({ params }) => {
-	const artwork = galleryMetadata.artworks.find((a) => a.id === params.id);
+		if (!response.ok) {
+			if (response.status === 404) {
+				error(404, 'Artwork not found');
+			}
+			error(500, 'Failed to load artwork');
+		}
 
-	if (!artwork) {
-		error(404, 'Artwork not found');
+		const data = await response.json();
+
+		if (!data.artwork) {
+			error(404, 'Artwork not found');
+		}
+
+		return {
+			artwork: data.artwork
+		};
+	} catch (err) {
+		console.error('Error loading artwork:', err);
+		error(500, 'Failed to load artwork');
 	}
-
-	return {
-		artwork
-	};
 };

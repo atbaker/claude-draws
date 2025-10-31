@@ -11,9 +11,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
 4. **Temporal workflows** orchestrate the post-processing pipeline
 5. **BAML extraction** parses Claude's title and artist statement from the final response
-6. **Cloudflare R2** stores artwork images and metadata
-7. **SvelteKit gallery** (`gallery/`) displays all artworks at claudedraws.com
-8. **Cloudflare Workers** hosts the static gallery site
+6. **Cloudflare R2** stores artwork images
+7. **Cloudflare D1** stores artwork metadata in SQLite database
+8. **SvelteKit gallery** (`gallery/`) displays all artworks at claudedraws.com with SSR-on-demand
+9. **Cloudflare Workers** hosts the gallery site
 
 ### Repository Structure (Monorepo)
 
@@ -28,7 +29,7 @@ claude-draws/
 │   ├── baml_src/        # BAML definitions for metadata extraction
 │   ├── pyproject.toml   # Python dependencies
 │   └── Dockerfile.worker # Container for worker
-├── gallery/             # SvelteKit frontend (static site)
+├── gallery/             # SvelteKit frontend (SSR-on-demand with D1 API)
 ├── .chrome-data/        # Chrome profile for automation (gitignored)
 ├── downloads/           # Temporary artwork storage (gitignored)
 ├── docs/               # Documentation
@@ -38,9 +39,9 @@ claude-draws/
 ### Key Components
 
 1. **Python CLI tool** (`backend/claudedraw/`) - Browser automation to submit prompts to Claude for Chrome
-2. **Temporal workflows** (`backend/workflows/`) - Orchestrates artwork processing, metadata extraction, R2 upload, gallery rebuild, and deployment
+2. **Temporal workflows** (`backend/workflows/`) - Orchestrates artwork processing, metadata extraction, R2 image upload, and D1 metadata insertion
 3. **Temporal worker** (`backend/worker/`) - Runs the Temporal worker process that executes workflow activities
-4. **SvelteKit gallery** (`gallery/`) - Static site deployed to Cloudflare Workers
+4. **SvelteKit gallery** (`gallery/`) - SSR-on-demand site with D1 API backend, deployed to Cloudflare Workers
 5. **BAML integration** (`backend/baml_src/`) - AI-powered extraction of artwork titles and artist statements
 
 ## Key Architecture Details
@@ -53,24 +54,17 @@ The workflow handles the **complete end-to-end process**:
 
 1. **Browser automation** - Finds pending submission from D1, submits to Claude, waits for completion
 2. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
-3. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket
-4. **Uploads metadata to R2** - Stores JSON metadata file alongside image
-5. **Appends to gallery metadata** - Updates local `gallery/src/lib/gallery-metadata.json` (gitignored)
-6. **Rebuilds static site** - Runs `npm run build` in gallery directory
-7. **Deploys to Cloudflare Workers** - Runs `wrangler deploy` to push updates live
-8. **Sends email notification** - Notifies requester when artwork is ready (if email provided)
-9. **Schedules next workflow** (continuous mode only) - Enables livestream operation
+3. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket with public access
+4. **Inserts metadata into D1** - Stores artwork metadata in D1 database (artwork appears immediately in gallery)
+5. **Sends email notification** - Notifies requester when artwork is ready (if email provided)
+6. **Schedules next workflow** (continuous mode only) - Enables livestream operation
 
 **Key activities** in `backend/workflows/activities.py`:
 - `browser_session_activity()` - Long-running activity that automates the browser (find submission → submit → wait → download)
 - `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
 - `upload_image_to_r2()` - Uploads PNG to R2 with public access
-- `upload_metadata_to_r2()` - Uploads JSON metadata to R2
-- `append_to_gallery_metadata()` - Updates local gallery metadata file
-- `rebuild_static_site()` - Runs npm build
-- `deploy_to_cloudflare()` - Deploys via wrangler
+- `insert_artwork_to_d1()` - Inserts artwork metadata into D1 database
 - `send_email_notification()` - Sends completion email to requester (if email provided)
-- `schedule_next_workflow()` - Schedules next workflow run (continuous mode)
 
 **Browser Automation Details** (implemented in `browser_session_activity()`):
 
@@ -113,18 +107,19 @@ This avoids fragile regex parsing and handles variations in Claude's response fo
 ### Gallery Architecture
 
 **Tech stack**:
-- **Framework**: SvelteKit with static adapter
+- **Framework**: SvelteKit with Cloudflare adapter (SSR-on-demand)
 - **Styling**: Tailwind CSS
-- **Hosting**: Cloudflare Workers (with static assets)
-- **Storage**: Cloudflare R2 for images and metadata
+- **Hosting**: Cloudflare Workers
+- **Database**: Cloudflare D1 for artwork metadata
+- **Storage**: Cloudflare R2 for images
 
-**Key design principle**: R2 is the source of truth. The local `gallery/src/lib/gallery-metadata.json` file is gitignored and regenerated from R2 as needed.
+**Key design principle**: D1 is the source of truth for metadata. Gallery pages use SSR-on-demand to fetch fresh data from D1 API endpoints, so new artworks appear immediately without requiring a rebuild or deployment.
 
-**Build process**:
-1. Temporal workflow appends new artwork to local JSON
-2. SvelteKit reads JSON at build time and pre-renders all pages
-3. Static HTML/CSS/JS output deployed to Cloudflare Workers
-4. No runtime database queries - everything is pre-rendered
+**Data flow**:
+1. Temporal workflow inserts artwork metadata into D1 database
+2. Gallery API endpoints (`/api/artworks`, `/api/artworks/[id]`) query D1
+3. SvelteKit pages fetch from these API endpoints at request time
+4. New artworks appear in gallery instantly (no build/deploy required)
 
 **Routes**:
 - `/` - Home page with livestream and gallery preview
@@ -250,7 +245,6 @@ uv run baml-cli generate
 ## Important Constraints
 
 - **Chrome data directory**: `.chrome-data/` is used for isolated Chrome profile (gitignored). Claude for Chrome extension must be installed and logged in here before running the CLI tool
-- **Gallery metadata**: `gallery/src/lib/gallery-metadata.json` is gitignored - it's auto-generated by Temporal workflows and should not be checked into Git
 - **Environment variables**: Required in `backend/.env` (copy from `backend/.env.example`):
   - `ANTHROPIC_API_KEY` - Anthropic API key for BAML
   - `R2_ACCOUNT_ID` - Cloudflare R2 account ID
@@ -280,9 +274,10 @@ uv run baml-cli generate
 
 ### Gallery not updating
 - Check Temporal workflow status in Temporal UI (http://localhost:8233)
-- Verify `gallery/src/lib/gallery-metadata.json` exists and contains new artwork
-- Check SvelteKit build logs for errors
-- Verify wrangler deployment succeeded
+- Verify artwork was inserted into D1: Check D1 database with `wrangler d1 execute claudedraws-dev --local --command "SELECT * FROM artworks ORDER BY created_at DESC LIMIT 5"`
+- Check that R2 image upload succeeded
+- Verify API endpoints are working: Visit `/api/artworks` to see if data is returned
+- Check browser console for API errors
 
 ### BAML extraction errors
 - Check that the HTML response from Claude contains title and description

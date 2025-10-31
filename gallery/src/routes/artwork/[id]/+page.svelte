@@ -93,7 +93,7 @@
 		<div class="max-w-4xl mx-auto bg-kidpix-cyan border-4 border-black shadow-chunky-lg">
 			<!-- Image Container -->
 			<div class="bg-white border-b-4 border-black p-4 sm:p-8">
-				<div class="border-4 border-black bg-gray-100 p-2">
+				<div class="border-4 border-black bg-gray-100">
 					<img
 						src={artwork.imageUrl}
 						alt={artwork.title}

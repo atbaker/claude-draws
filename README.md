@@ -13,7 +13,7 @@ Claude Draws is a fully automated art pipeline that:
 
 1. **Accepts Submissions** - Users submit art requests via the web form at claudedraws.com/submit
 2. **Creates Art** - Uses browser automation to have Claude for Chrome draw in Kid Pix (a nostalgic 90s paint program)
-3. **Processes & Publishes** - Automatically extracts metadata, uploads to cloud storage, rebuilds and deploys the gallery website
+3. **Processes & Publishes** - Automatically extracts metadata, uploads images to R2 storage, and saves metadata to D1 database
 4. **Notifies Users** - Sends email notifications when artworks are complete (if email provided)
 
 The entire process runs autonomously - from request to published artwork - with no manual intervention required.
@@ -26,14 +26,13 @@ The entire process runs autonomously - from request to published artwork - with 
 Web Form Submission → Cloudflare D1 Database → Browser Automation →
   → Claude Draws in Kid Pix → Temporal Workflow →
   → BAML Metadata Extraction → Cloudflare R2 Storage →
-  → Gallery Site Rebuild → Cloudflare Workers Deployment →
-  → Email Notification (optional)
+  → D1 Metadata Insert → Email Notification (optional)
 ```
 
 ### Technology Stack
 
 **Frontend**
-- [SvelteKit](https://kit.svelte.dev/) - Static site generator
+- [SvelteKit](https://kit.svelte.dev/) - SSR-on-demand with D1 API backend
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
 - [Cloudflare Workers](https://workers.cloudflare.com/) - Hosting
 
@@ -42,7 +41,8 @@ Web Form Submission → Cloudflare D1 Database → Browser Automation →
 - [Playwright](https://playwright.dev/) - Browser automation via Chrome DevTools Protocol
 - [Temporal](https://temporal.io/) - Workflow orchestration
 - [BAML](https://www.boundaryml.com/) - AI-powered metadata extraction
-- [Cloudflare R2](https://www.cloudflare.com/products/r2/) - Object storage
+- [Cloudflare D1](https://developers.cloudflare.com/d1/) - SQLite database for artwork metadata
+- [Cloudflare R2](https://www.cloudflare.com/products/r2/) - Object storage for images
 
 **Art Tool**
 - [Kid Pix](https://kidpix.app/) - Open-source JavaScript recreation of the classic 90s drawing program
@@ -104,13 +104,13 @@ Each artwork includes:
 Uses Playwright with Chrome DevTools Protocol (CDP) to control Claude for Chrome extension, combined with OS-level keyboard automation to trigger browser shortcuts.
 
 ### Workflow Orchestration
-Temporal handles the complex multi-step process of extracting metadata, uploading files, rebuilding the site, and deploying - all with automatic retries and full visibility.
+Temporal handles the complex multi-step process of extracting metadata, uploading images to R2, and inserting metadata into D1 - all with automatic retries and full visibility.
 
 ### Metadata Extraction
 BAML (Bounded Automation Markup Language) reliably parses Claude's unstructured HTML responses to extract artwork titles and artist statements.
 
-### Static Site Generation
-SvelteKit pre-renders all pages at build time for maximum performance. No runtime database queries or API calls needed.
+### Dynamic Gallery with D1
+SvelteKit uses SSR-on-demand to render pages with fresh data from D1 database. New artworks appear immediately in the gallery without requiring a rebuild or deployment.
 
 ## License
 

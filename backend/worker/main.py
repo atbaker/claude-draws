@@ -13,26 +13,21 @@ load_dotenv()
 
 # Import workflow and activities
 from workflows.activities import (
-    append_to_gallery_metadata,
     browser_session_activity,
     check_for_pending_submissions,
     cleanup_tab_activity,
-    deploy_to_cloudflare,
     extract_artwork_metadata,
-    rebuild_static_site,
+    insert_artwork_to_d1,
     send_email_notification,
     start_check_submissions_workflow,
-    start_gallery_deployment_workflow,
     switch_obs_scene,
     update_countdown_text,
     update_submission_status,
     upload_image_to_r2,
-    upload_metadata_to_r2,
     visit_gallery_activity,
 )
 from workflows.check_submissions import CheckSubmissionsWorkflow
 from workflows.create_artwork import CreateArtworkWorkflow
-from workflows.deploy_gallery import DeployGalleryWorkflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,23 +51,19 @@ async def main():
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[CheckSubmissionsWorkflow, CreateArtworkWorkflow, DeployGalleryWorkflow],
+        workflows=[CheckSubmissionsWorkflow, CreateArtworkWorkflow],
         activities=[
             browser_session_activity,
             check_for_pending_submissions,
             cleanup_tab_activity,
             extract_artwork_metadata,
-            upload_image_to_r2,
-            upload_metadata_to_r2,
-            append_to_gallery_metadata,
-            update_submission_status,
+            insert_artwork_to_d1,
             send_email_notification,
             start_check_submissions_workflow,
-            start_gallery_deployment_workflow,
-            rebuild_static_site,
-            deploy_to_cloudflare,
             switch_obs_scene,
             update_countdown_text,
+            update_submission_status,
+            upload_image_to_r2,
             visit_gallery_activity,
         ],
         max_concurrent_activities=4,
