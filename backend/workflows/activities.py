@@ -833,6 +833,127 @@ async def update_countdown_text(seconds: int) -> None:
 
 
 @activity.defn
+async def ensure_obs_streaming() -> None:
+    """
+    Ensure OBS is streaming, starting the stream if necessary.
+
+    This is useful after PC wake from sleep, where OBS may not automatically
+    resume streaming even though the application is still running.
+
+    Raises:
+        OBSWebSocketError: If stream status check or start fails (workflow will fail)
+    """
+    activity.logger.info("Checking OBS streaming status...")
+
+    try:
+        async with OBSWebSocketClient(
+            url=OBS_WEBSOCKET_URL,
+            password=OBS_WEBSOCKET_PASSWORD,
+        ) as obs:
+            is_streaming = await obs.get_stream_status()
+
+            if is_streaming:
+                activity.logger.info("✓ OBS is already streaming")
+            else:
+                activity.logger.info("OBS is not streaming - starting stream...")
+                await obs.start_stream()
+                activity.logger.info("✓ OBS stream started successfully")
+
+    except OBSWebSocketError as e:
+        activity.logger.error(f"✗ Failed to ensure OBS streaming: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error ensuring OBS streaming: {e}")
+        raise OBSWebSocketError(f"Unexpected error: {e}")
+
+
+@activity.defn
+async def check_inactivity_and_stop_streaming(inactivity_threshold_minutes: int = 15) -> bool:
+    """
+    Check for inactivity and stop OBS streaming if system has been idle.
+
+    This prepares the system for sleep by stopping OBS streaming, which
+    prevents Windows sleep from being blocked.
+
+    Inactivity is determined by:
+    1. No submissions with status = 'processing'
+    2. Time since last completed artwork > threshold (default 15 minutes)
+
+    Args:
+        inactivity_threshold_minutes: Minutes of inactivity before stopping stream
+
+    Returns:
+        bool: True if streaming was stopped, False otherwise
+
+    Raises:
+        OBSWebSocketError: If OBS operations fail (workflow will fail)
+    """
+    activity.logger.info(f"Checking for inactivity (threshold: {inactivity_threshold_minutes} minutes)...")
+
+    try:
+        # Check 1: Are there any submissions currently being processed?
+        activity.logger.info("Checking for in-progress submissions...")
+        processing_result = await query_d1(
+            "SELECT COUNT(*) as count FROM submissions WHERE status = 'processing'"
+        )
+        processing_count = processing_result.get("result", [{}])[0].get("results", [{}])[0].get("count", 0)
+
+        if processing_count > 0:
+            activity.logger.info(f"Found {processing_count} submission(s) in progress - not stopping stream")
+            return False
+
+        activity.logger.info("No submissions in progress")
+
+        # Check 2: When was the last artwork completed?
+        activity.logger.info("Checking time since last completed artwork...")
+        completed_result = await query_d1(
+            "SELECT MAX(completed_at) as last_completed FROM submissions WHERE status = 'completed'"
+        )
+        last_completed = completed_result.get("result", [{}])[0].get("results", [{}])[0].get("last_completed")
+
+        if not last_completed:
+            activity.logger.info("No completed artworks found - not stopping stream")
+            return False
+
+        # Parse ISO 8601 timestamp and calculate minutes since completion
+        from datetime import datetime, timezone
+        last_completed_time = datetime.fromisoformat(last_completed.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        minutes_since_completion = (now - last_completed_time).total_seconds() / 60
+
+        activity.logger.info(f"Last artwork completed {minutes_since_completion:.1f} minutes ago")
+
+        if minutes_since_completion < inactivity_threshold_minutes:
+            activity.logger.info(f"Below inactivity threshold - not stopping stream")
+            return False
+
+        # Conditions met - stop OBS streaming
+        activity.logger.info("Inactivity threshold exceeded - stopping OBS stream...")
+
+        async with OBSWebSocketClient(
+            url=OBS_WEBSOCKET_URL,
+            password=OBS_WEBSOCKET_PASSWORD,
+        ) as obs:
+            # Check if currently streaming
+            is_streaming = await obs.get_stream_status()
+
+            if is_streaming:
+                await obs.stop_stream()
+                activity.logger.info("✓ OBS stream stopped successfully")
+                return True
+            else:
+                activity.logger.info("OBS is not currently streaming - no action needed")
+                return False
+
+    except OBSWebSocketError as e:
+        activity.logger.error(f"✗ Failed to check inactivity and stop streaming: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error checking inactivity: {e}")
+        raise
+
+
+@activity.defn
 async def check_for_pending_submissions() -> Optional[Dict]:
     """
     Check D1 database for pending submissions.

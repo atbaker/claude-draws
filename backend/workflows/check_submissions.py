@@ -10,6 +10,8 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from workflows.activities import (
         check_for_pending_submissions,
+        check_inactivity_and_stop_streaming,
+        ensure_obs_streaming,
         start_check_submissions_workflow,
         switch_obs_scene,
         update_countdown_text,
@@ -62,6 +64,14 @@ class CheckSubmissionsWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         workflow.logger.info(f"✓ Switched to main scene: {OBS_MAIN_SCENE}")
+
+        # Ensure OBS is streaming (may need to restart after wake from sleep)
+        await workflow.execute_activity(
+            ensure_obs_streaming,
+            start_to_close_timeout=timedelta(seconds=15),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        workflow.logger.info("✓ OBS streaming confirmed")
 
         # Visit gallery homepage for 5 seconds (shows on livestream)
         await workflow.execute_activity(
@@ -162,6 +172,23 @@ class CheckSubmissionsWorkflow:
                     await workflow.sleep(timedelta(seconds=1))
 
                 workflow.logger.info("✓ Countdown complete")
+
+                # Check for inactivity and stop streaming if idle
+                # This allows Windows to sleep (OBS streaming blocks sleep)
+                streaming_stopped = await workflow.execute_activity(
+                    check_inactivity_and_stop_streaming,
+                    args=[15],  # 15 minutes inactivity threshold
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
+                )
+
+                if streaming_stopped:
+                    workflow.logger.info("✓ OBS streaming stopped due to inactivity")
+                    workflow.logger.info("Waiting 60 seconds to allow PC to enter sleep mode...")
+                    # Give PowerShell sleep monitor time to trigger Windows sleep
+                    # The workflow will resume here after PC wakes from sleep
+                    await workflow.sleep(timedelta(seconds=60))
+                    workflow.logger.info("✓ Sleep window complete - resuming workflow")
 
                 # Start a new CheckSubmissionsWorkflow to check again
                 workflow.logger.info("Starting new CheckSubmissionsWorkflow...")

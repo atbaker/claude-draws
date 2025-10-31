@@ -1,0 +1,36 @@
+[Unit]
+Description=Claude Draws Wake-on-LAN Monitor
+Documentation=https://github.com/atbaker/claude-draws
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_GROUP
+WorkingDirectory=/path/to/claude-draws/scripts
+
+# Environment variables (customize these)
+Environment="WOL_MAC_ADDRESS=[your address here]"
+Environment="CLOUDFLARE_ACCOUNT_ID=your_account_id"
+Environment="D1_DATABASE_ID=your_database_id"
+Environment="CLOUDFLARE_API_TOKEN=your_api_token"
+Environment="WOL_POLL_INTERVAL=30"
+Environment="WOL_LOG_FILE=/var/log/claude-draws-wol-monitor.log"
+
+# Alternatively, use an environment file
+# EnvironmentFile=/etc/claude-draws/wol-monitor.env
+
+ExecStart=/path/to/claude-draws/scripts/wol_monitor.sh
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=claude-draws-wol
+
+[Install]
+WantedBy=multi-user.target

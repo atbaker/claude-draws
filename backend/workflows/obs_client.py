@@ -323,3 +323,41 @@ class OBSWebSocketClient:
                 "inputSettings": {"text": text},
             },
         )
+
+    async def get_stream_status(self) -> bool:
+        """
+        Get the current streaming status.
+
+        Returns:
+            True if OBS is currently streaming, False otherwise
+
+        Raises:
+            OBSWebSocketError: If status check fails
+        """
+        logger.debug("Checking OBS stream status")
+        response = await self.send_request("GetStreamStatus")
+        is_streaming = response.get("outputActive", False)
+        logger.debug(f"Stream status: {'active' if is_streaming else 'inactive'}")
+        return is_streaming
+
+    async def start_stream(self) -> None:
+        """
+        Start streaming in OBS.
+
+        Raises:
+            OBSWebSocketError: If stream start fails
+        """
+        logger.info("Starting OBS stream")
+        await self.send_request("StartStream")
+        logger.info("Successfully started OBS stream")
+
+    async def stop_stream(self) -> None:
+        """
+        Stop streaming in OBS.
+
+        Raises:
+            OBSWebSocketError: If stream stop fails
+        """
+        logger.info("Stopping OBS stream")
+        await self.send_request("StopStream")
+        logger.info("Successfully stopped OBS stream")

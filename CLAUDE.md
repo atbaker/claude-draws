@@ -139,6 +139,45 @@ This avoids fragile regex parsing and handles variations in Claude's response fo
 - **User restrictions**: Users cannot upvote or un-upvote their own submissions, but can toggle upvotes on others' submissions
 - **Database ordering**: Queries use `ORDER BY upvote_count DESC, created_at ASC` for efficient queue processing
 
+### Power Management (Wake-on-LAN)
+
+The system includes automated power management to reduce energy consumption while maintaining responsiveness to new submissions. The Windows PC automatically sleeps after inactivity and wakes when new requests arrive.
+
+**Architecture**:
+
+1. **Sleep Monitor** (`scripts/sleep_monitor.ps1`) - PowerShell script running on Windows PC
+   - Queries D1 database every 60 seconds to check for:
+     - Active submissions (status = 'processing')
+     - Time since last completed artwork
+   - Triggers Windows sleep if no activity for 15+ minutes (configurable)
+   - Runs as Windows Scheduled Task (starts automatically at boot)
+   - Uses Cloudflare D1 REST API to query submission status
+
+2. **Wake-on-LAN Monitor** (`scripts/wol_monitor.sh`) - Bash script running on remote server (e.g., Home Assistant)
+   - Queries D1 database every 30 seconds for pending submissions
+   - Sends Wake-on-LAN magic packet when pending submission detected
+   - Includes 5-minute cooldown between wake attempts
+   - Can run as systemd service for automatic restart
+
+3. **OBS Streaming Resume** (`workflows/activities.py` - `ensure_obs_streaming()`)
+   - Temporal activity that checks OBS streaming status after scene switch
+   - Automatically restarts OBS stream if not active (useful after wake from sleep)
+   - Called in `CheckSubmissionsWorkflow` before displaying gallery
+
+**Setup Instructions**: See `scripts/README.md` for detailed installation and configuration instructions.
+
+**Key benefits**:
+- Significantly reduces power consumption during idle periods
+- PC automatically wakes when work is available
+- No manual intervention required
+- All Docker containers (Temporal, worker) resume automatically after wake
+- OBS streaming automatically resumes via workflow activity
+
+**Requirements**:
+- Wake-on-LAN enabled in PC BIOS and network adapter settings
+- PC and remote server on same network/subnet
+- Cloudflare D1 API credentials configured in `backend/.env`
+
 ## Development Commands
 
 ### Full Stack Development Setup
