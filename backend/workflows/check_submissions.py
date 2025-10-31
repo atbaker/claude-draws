@@ -58,7 +58,7 @@ class CheckSubmissionsWorkflow:
         await workflow.execute_activity(
             switch_obs_scene,
             args=[OBS_MAIN_SCENE],
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(seconds=15),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         workflow.logger.info(f"✓ Switched to main scene: {OBS_MAIN_SCENE}")
@@ -142,7 +142,7 @@ class CheckSubmissionsWorkflow:
                 await workflow.execute_activity(
                     switch_obs_scene,
                     args=[OBS_SCREENSAVER_SCENE],
-                    start_to_close_timeout=timedelta(seconds=10),
+                    start_to_close_timeout=timedelta(seconds=15),
                     retry_policy=RetryPolicy(maximum_attempts=3),
                 )
                 workflow.logger.info(f"✓ Switched to screensaver scene: {OBS_SCREENSAVER_SCENE}")
@@ -154,7 +154,7 @@ class CheckSubmissionsWorkflow:
                     await workflow.execute_activity(
                         update_countdown_text,
                         args=[seconds_remaining],
-                        start_to_close_timeout=timedelta(seconds=10),
+                        start_to_close_timeout=timedelta(seconds=15),
                         retry_policy=RetryPolicy(maximum_attempts=3),
                     )
 
