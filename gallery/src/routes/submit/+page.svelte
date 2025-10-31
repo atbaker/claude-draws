@@ -113,6 +113,9 @@
 					<p>
 						Claude Draws will illustrate your request and add it to the gallery. You can optionally provide an email address for a notification when it's complete.
 					</p>
+					<p>
+						Looking for inspiration? Check out the <a href="/gallery">gallery</a> to see what Claude Draws has created so far!
+					</p>
 				</div>
 			</div>
 
