@@ -154,10 +154,11 @@ The system includes automated power management to reduce energy consumption whil
    - Uses Cloudflare D1 REST API to query submission status
 
 2. **Wake-on-LAN Monitor** (`scripts/wol_monitor.sh`) - Bash script running on remote server (e.g., Home Assistant)
-   - Queries D1 database every 30 seconds for pending submissions
-   - Sends Wake-on-LAN magic packet when pending submission detected
-   - Includes 5-minute cooldown between wake attempts
-   - Can run as systemd service for automatic restart
+   - Runs once per invocation (scheduled by Home Assistant automation every 30 seconds)
+   - Queries D1 database for pending submissions via REST API
+   - Returns exit code: 0 = wake needed, 1 = no action, 2 = error
+   - Home Assistant's `wake_on_lan` integration sends magic packet when exit code is 0
+   - Designed for Home Assistant OS (no dependency installation required)
 
 3. **OBS Streaming Resume** (`workflows/activities.py` - `ensure_obs_streaming()`)
    - Temporal activity that checks OBS streaming status after scene switch
