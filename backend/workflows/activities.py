@@ -719,52 +719,6 @@ async def cleanup_tab_activity(cdp_url: str, tab_url: str) -> None:
             activity.logger.warning(f"⚠ Could not find tab at {tab_url} to close")
 
 
-@activity.defn
-async def start_check_submissions_workflow(cdp_url: str, continuous: bool) -> str:
-    """
-    Start a new top-level CheckSubmissionsWorkflow.
-
-    This activity is used for workflow chaining in continuous mode. By starting
-    the next workflow as a top-level workflow (not a child), we avoid race conditions
-    that can occur when a parent workflow completes immediately after starting a child.
-
-    Args:
-        cdp_url: Chrome DevTools Protocol URL to pass to the new workflow
-        continuous: Whether the new workflow should also run in continuous mode
-
-    Returns:
-        str: The workflow ID of the newly started workflow
-
-    Raises:
-        Exception: If workflow start fails (will trigger Temporal retry)
-    """
-    activity.logger.info("Starting new CheckSubmissionsWorkflow...")
-
-    try:
-        # Get Temporal client
-        client = await Client.connect(TEMPORAL_HOST)
-
-        # Generate unique workflow ID based on timestamp
-        timestamp = int(time.time())
-        workflow_id = f"check-submissions-{timestamp}"
-
-        # Start the new CheckSubmissionsWorkflow as a top-level workflow
-        await client.start_workflow(
-            "CheckSubmissionsWorkflow",
-            args=[cdp_url, continuous],
-            id=workflow_id,
-            task_queue=TASK_QUEUE,
-        )
-
-        activity.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {workflow_id}")
-        return workflow_id
-
-    except Exception as e:
-        activity.logger.error(f"✗ Error starting CheckSubmissionsWorkflow: {e}")
-        # Re-raise to trigger Temporal retry
-        raise
-
-
 # ============================================================================
 # OBS Control Activities
 # ============================================================================

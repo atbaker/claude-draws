@@ -12,7 +12,6 @@ with workflow.unsafe.imports_passed_through():
         check_for_pending_submissions,
         check_inactivity_and_stop_streaming,
         ensure_obs_streaming,
-        start_check_submissions_workflow,
         switch_obs_scene,
         update_countdown_text,
         visit_gallery_activity,
@@ -29,21 +28,24 @@ class CheckSubmissionsWorkflow:
     2. Checks for pending submissions
     3. If found: Starts CreateArtworkWorkflow and waits for completion
     4. If not found (continuous mode): Displays 60-second countdown
-    5. In continuous mode: Starts a new CheckSubmissionsWorkflow before returning
+    5. In continuous mode: Uses continue_as_new to reset workflow history
 
-    This workflow is designed for workflow chaining in continuous mode,
-    creating a dynamic livestream experience with countdown timers between artworks.
-    Each check cycle gets its own workflow execution for better observability.
+    This workflow uses continue_as_new in continuous mode to prevent workflow
+    history growth while creating a dynamic livestream experience with countdown
+    timers between artworks. The workflow history is reset after each check cycle.
 
     Args:
         cdp_url: Chrome DevTools Protocol endpoint URL
-        continuous: Whether to start a new CheckSubmissionsWorkflow after this execution
+        continuous: Whether to continue checking for submissions indefinitely
 
     Returns:
         dict: Dictionary containing:
             - submission_id: ID of the submission that was found (if any)
             - artwork_workflow_id: ID of the CreateArtworkWorkflow that was started (if submission found)
             - artwork_url: URL of the artwork (if submission found)
+
+        Note: In continuous mode, this return value is only reached if the workflow
+        is terminated externally, as continue_as_new restarts the workflow.
     """
 
     @workflow.run
@@ -118,22 +120,12 @@ class CheckSubmissionsWorkflow:
             workflow.logger.info(f"✓ CreateArtworkWorkflow completed: {artwork_workflow_id}")
             workflow.logger.info(f"  Artwork URL: {artwork_result['artwork_url']}")
 
-            # If continuous mode, start a new CheckSubmissionsWorkflow
+            # If continuous mode, use continue_as_new to reset workflow history
             if continuous:
-                workflow.logger.info("Continuous mode: starting new CheckSubmissionsWorkflow...")
+                workflow.logger.info("Continuous mode: resetting workflow history with continue_as_new...")
+                workflow.continue_as_new(cdp_url, continuous)
 
-                # Start new check workflow as a top-level workflow (not a child)
-                # This avoids race conditions that occur when parent completes immediately after starting child
-                new_check_workflow_id = await workflow.execute_activity(
-                    start_check_submissions_workflow,
-                    args=[cdp_url, continuous],
-                    start_to_close_timeout=timedelta(seconds=10),
-                    retry_policy=RetryPolicy(maximum_attempts=3),
-                )
-
-                workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
-
-            # Return result
+            # Return result (only reached if not continuous mode)
             return {
                 "submission_id": submission["id"],
                 "artwork_workflow_id": artwork_workflow_id,
@@ -190,26 +182,9 @@ class CheckSubmissionsWorkflow:
                     await workflow.sleep(timedelta(seconds=60))
                     workflow.logger.info("✓ Sleep window complete - resuming workflow")
 
-                # Start a new CheckSubmissionsWorkflow to check again
-                workflow.logger.info("Starting new CheckSubmissionsWorkflow...")
-
-                # Start new check workflow as a top-level workflow (not a child)
-                # This avoids race conditions that occur when parent completes immediately after starting child
-                new_check_workflow_id = await workflow.execute_activity(
-                    start_check_submissions_workflow,
-                    args=[cdp_url, continuous],
-                    start_to_close_timeout=timedelta(seconds=10),
-                    retry_policy=RetryPolicy(maximum_attempts=3),
-                )
-
-                workflow.logger.info(f"✓ Started new CheckSubmissionsWorkflow: {new_check_workflow_id}")
-
-                # Return with no submission found
-                return {
-                    "submission_id": None,
-                    "artwork_workflow_id": None,
-                    "artwork_url": None,
-                }
+                # Use continue_as_new to reset workflow history
+                workflow.logger.info("Resetting workflow history with continue_as_new...")
+                workflow.continue_as_new(cdp_url, continuous)
 
             else:
                 # Not continuous mode: just return
