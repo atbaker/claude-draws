@@ -93,11 +93,13 @@ Remove-Item backend\scripts\sleep_monitor.log
 ### Prerequisites
 
 - Linux server on the same network as Windows PC (e.g., Home Assistant, Raspberry Pi)
-- `wakeonlan` package installed
-- `jq` package installed (for JSON parsing)
-- `curl` installed
+- `jq` package (for JSON parsing, usually pre-installed)
+- `curl` (usually pre-installed)
 - Cloudflare D1 database credentials
 - PC's MAC address and Wake-on-LAN enabled in BIOS
+- **For Home Assistant**: The `wake_on_lan` integration (install via Configuration → Integrations)
+
+**Note**: The script checks D1 for pending submissions and returns an exit code. Home Assistant's `wake_on_lan` integration sends the actual WoL packet (avoiding network interface complexity in containerized environments).
 
 ### Enable Wake-on-LAN on Windows PC
 
@@ -120,171 +122,181 @@ Remove-Item backend\scripts\sleep_monitor.log
    - Check "Allow this device to wake the computer"
    - Check "Only allow a magic packet to wake the computer"
 
-### Installation on Remote Server
+### Installation on Home Assistant
 
-1. **Install dependencies**:
+1. **Install the Wake-on-LAN integration**:
+   - Go to Configuration → Devices & Services → Add Integration
+   - Search for "Wake on LAN" and install it
+   - Or add to `configuration.yaml`:
+     ```yaml
+     wake_on_lan:
+     ```
+
+2. **Copy the script to Home Assistant**:
+   - Use the File Editor add-on or SSH to create `/config/scripts/wol_monitor.sh`
+   - Copy the contents from `scripts/wol_monitor.sh`
+   - Make it executable: `chmod +x /config/scripts/wol_monitor.sh`
+
+3. **Add to `configuration.yaml`**:
+   ```yaml
+   shell_command:
+     check_claude_draws: >
+       /config/scripts/wol_monitor.sh
+       --account-id your_cloudflare_account_id
+       --database-id your_d1_database_id
+       --api-token your_cloudflare_api_token
+       --log-file /config/logs/wol_monitor.log
+   ```
+
+4. **Create the automation**:
+   ```yaml
+   automation:
+     - alias: "Check for Claude Draws submissions and wake PC"
+       trigger:
+         - platform: time_pattern
+           seconds: "/30"  # Run every 30 seconds
+       action:
+         - service: shell_command.check_claude_draws
+           response_variable: check_result
+         - if:
+             - condition: template
+               value_template: "{{ check_result.returncode == 0 }}"
+           then:
+             - service: wake_on_lan.send_magic_packet
+               data:
+                 mac: "2C:F0:5D:70:48:AA"  # Replace with your PC's MAC address
+   ```
+
+5. **Restart Home Assistant** to apply the changes
+
+### Installation on Standard Linux Server
+
+For non-Home Assistant environments, combine the check script with `wakeonlan` or `etherwake`:
+
+1. **Install wakeonlan**:
    ```bash
    # Debian/Ubuntu
-   sudo apt-get install wakeonlan jq curl
+   sudo apt-get install wakeonlan
 
    # Arch Linux
-   sudo pacman -S wakeonlan jq curl
-
-   # macOS (via Homebrew)
-   brew install wakeonlan jq curl
+   sudo pacman -S wakeonlan
    ```
 
-2. **Copy the script to your server**:
+2. **Create a wrapper script** that runs the check and sends WoL:
    ```bash
-   scp scripts/wol_monitor.sh user@your-server:/home/user/
-   scp scripts/wol_monitor.service user@your-server:/home/user/
+   #!/bin/bash
+   /path/to/wol_monitor.sh --account-id ... --database-id ... --api-token ...
+   if [ $? -eq 0 ]; then
+     wakeonlan 2C:F0:5D:70:48:AA
+   fi
    ```
 
-3. **Configure environment variables**:
-
-   **Option A: Using command-line arguments** (recommended for testing):
+3. **Schedule with cron**:
    ```bash
-   chmod +x wol_monitor.sh
-   ./wol_monitor.sh \
-     --mac-address [your address here] \
-     --account-id your_cloudflare_account_id \
-     --database-id your_d1_database_id \
-     --api-token your_cloudflare_api_token \
-     --poll-interval 30
-   ```
-
-   **Option B: Using environment variables**:
-   ```bash
-   export WOL_MAC_ADDRESS="[your address here]"
-   export CLOUDFLARE_ACCOUNT_ID="your_account_id"
-   export D1_DATABASE_ID="your_database_id"
-   export CLOUDFLARE_API_TOKEN="your_api_token"
-   export WOL_POLL_INTERVAL=30
-
-   ./wol_monitor.sh
-   ```
-
-   **Option C: Using environment file** (recommended for systemd):
-   ```bash
-   # Create environment file
-   sudo mkdir -p /etc/claude-draws
-   sudo nano /etc/claude-draws/wol-monitor.env
-
-   # Add these lines:
-   WOL_MAC_ADDRESS=[your address here]
-   CLOUDFLARE_ACCOUNT_ID=your_account_id
-   D1_DATABASE_ID=your_database_id
-   CLOUDFLARE_API_TOKEN=your_api_token
-   WOL_POLL_INTERVAL=30
-   WOL_LOG_FILE=/var/log/claude-draws-wol-monitor.log
-   ```
-
-4. **Set up systemd service** (optional but recommended):
-   ```bash
-   # Edit the service file with your paths and credentials
-   sudo nano wol_monitor.service
-
-   # Update these fields:
-   # - User=YOUR_USERNAME
-   # - Group=YOUR_GROUP
-   # - WorkingDirectory=/path/to/claude-draws/scripts
-   # - ExecStart=/path/to/claude-draws/scripts/wol_monitor.sh
-   # - Environment variables or EnvironmentFile path
-
-   # Install the service
-   sudo cp wol_monitor.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable claude-draws-wol-monitor
-   sudo systemctl start claude-draws-wol-monitor
-   ```
-
-5. **Verify it's running**:
-   ```bash
-   # Check service status
-   sudo systemctl status claude-draws-wol-monitor
-
-   # View logs
-   sudo journalctl -u claude-draws-wol-monitor -f
-
-   # Or check the log file directly
-   tail -f /var/log/claude-draws-wol-monitor.log
+   # Run every 30 seconds
+   * * * * * /path/to/wrapper.sh
+   * * * * * sleep 30; /path/to/wrapper.sh
    ```
 
 ### How It Works
 
-The WoL monitor runs continuously and:
+The WoL monitor is a two-part system:
 
-1. Every 30 seconds, queries D1 database for pending submissions
-2. If pending submissions found:
-   - Sends Wake-on-LAN magic packet to PC's MAC address
-   - Enforces 5-minute cooldown between wake attempts
-3. Logs all activity for debugging
+**Part 1: Check Script** (`wol_monitor.sh`)
+1. Queries D1 database for pending submissions via REST API
+2. Returns exit code based on result:
+   - **Exit 0**: Pending submissions found → trigger WoL
+   - **Exit 1**: No pending submissions → no action
+   - **Exit 2**: Query error → check logs
+
+**Part 2: Wake-on-LAN** (Home Assistant integration)
+1. Home Assistant automation runs the check script every 30 seconds
+2. If exit code is 0, Home Assistant's `wake_on_lan` integration sends the magic packet
+3. PC wakes up and resumes Temporal workflow
+
+This two-part design avoids network interface issues in containerized environments.
 
 ### Configuration
 
 Environment variables / command-line arguments:
 
-- `WOL_MAC_ADDRESS` / `--mac-address` (required) - MAC address of Windows PC
 - `CLOUDFLARE_ACCOUNT_ID` / `--account-id` (required) - Cloudflare account ID
 - `D1_DATABASE_ID` / `--database-id` (required) - D1 database ID
 - `CLOUDFLARE_API_TOKEN` / `--api-token` (required) - Cloudflare API token
-- `WOL_POLL_INTERVAL` / `--poll-interval` (default: 30) - Seconds between checks
 - `WOL_LOG_FILE` / `--log-file` (default: /tmp/claude-draws-wol-monitor.log) - Log file path
 
 ### Troubleshooting
 
 **PC not waking:**
 - Verify Wake-on-LAN is enabled in BIOS and Windows (see prerequisites)
-- Check if WoL packet is being sent: `sudo journalctl -u claude-draws-wol-monitor -n 50`
-- Test WoL manually: `wakeonlan [your address here]`
-- Ensure PC and server are on same subnet/VLAN
+- Check Home Assistant automation history to see if WoL packet was sent
+- Test WoL manually in Home Assistant: Developer Tools → Services → `wake_on_lan.send_magic_packet`
+- Verify the MAC address is correct in your automation
+- Ensure PC and Home Assistant are on same subnet/VLAN
 - Check router doesn't block WoL packets
 - Try disabling "Fast Startup" in Windows power settings
 
 **Script not finding pending submissions:**
-- Verify D1 credentials are correct
-- Test D1 query manually:
+- Check the script logs: `tail -50 /config/logs/wol_monitor.log`
+- Verify D1 credentials are correct in `configuration.yaml`
+- Test D1 query manually from Home Assistant Terminal add-on:
   ```bash
   curl -X POST "https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT/d1/database/YOUR_DB/query" \
     -H "Authorization: Bearer YOUR_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"sql":"SELECT COUNT(*) as count FROM submissions WHERE status = '\''pending'\''"}'
   ```
+- Check automation is running: Configuration → Automations & Scenes
 
-**Service not starting:**
-- Check service logs: `sudo journalctl -u claude-draws-wol-monitor -n 50`
-- Verify script path in service file
-- Check file permissions: `ls -la /path/to/wol_monitor.sh`
-- Ensure dependencies installed: `which wakeonlan jq curl`
+**Automation not triggering:**
+- Check automation history in Home Assistant UI
+- Verify shell_command is defined in `configuration.yaml`
+- Check Home Assistant logs: Settings → System → Logs
+- Test shell command manually: Developer Tools → Services → `shell_command.check_claude_draws`
+- Verify script has execute permissions: `ls -la /config/scripts/wol_monitor.sh`
 
 ### Uninstalling
 
-```bash
-# Stop and disable service
-sudo systemctl stop claude-draws-wol-monitor
-sudo systemctl disable claude-draws-wol-monitor
+**For Home Assistant:**
+- Delete the shell_command and automation from `configuration.yaml`
+- Remove the script file from `/config/scripts/`
 
-# Remove service file
+**For systemd:**
+```bash
+# Stop and disable service/timer
+sudo systemctl stop claude-draws-wol-monitor.timer
+sudo systemctl disable claude-draws-wol-monitor.timer
+
+# Remove service files
 sudo rm /etc/systemd/system/wol_monitor.service
+sudo rm /etc/systemd/system/wol_monitor.timer
 sudo systemctl daemon-reload
 
-# Remove environment file and logs (optional)
-sudo rm /etc/claude-draws/wol-monitor.env
+# Remove logs (optional)
 sudo rm /var/log/claude-draws-wol-monitor.log
 ```
+
+**For cron:**
+- Remove the cron entries: `crontab -e` and delete the relevant lines
 
 ## Testing the Complete System
 
 1. **Verify sleep monitor is running** on Windows PC:
    ```powershell
    Get-ScheduledTask -TaskName "ClaudeDraws-SleepMonitor"
-   Get-Content backend\scripts\sleep_monitor.log -Tail 10
+   Get-Content scripts\sleep_monitor.log -Tail 10
    ```
 
-2. **Verify WoL monitor is running** on remote server:
+2. **Verify WoL monitor is configured** on remote server:
    ```bash
-   sudo systemctl status claude-draws-wol-monitor
-   tail -20 /var/log/claude-draws-wol-monitor.log
+   # For Home Assistant: Check automation in UI
+   # For systemd: sudo systemctl status claude-draws-wol-monitor.timer
+   # For cron: crontab -l | grep wol_monitor
+
+   # Check recent logs
+   tail -20 /config/logs/wol_monitor.log  # Home Assistant
+   # or
+   tail -20 /tmp/claude-draws-wol-monitor.log  # Other systems
    ```
 
 3. **Test sleep trigger**:
