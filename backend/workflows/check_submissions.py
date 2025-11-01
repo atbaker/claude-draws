@@ -123,7 +123,7 @@ class CheckSubmissionsWorkflow:
             # If continuous mode, use continue_as_new to reset workflow history
             if continuous:
                 workflow.logger.info("Continuous mode: resetting workflow history with continue_as_new...")
-                workflow.continue_as_new(cdp_url, continuous)
+                workflow.continue_as_new(args=[cdp_url, continuous])
 
             # Return result (only reached if not continuous mode)
             return {
@@ -184,7 +184,7 @@ class CheckSubmissionsWorkflow:
 
                 # Use continue_as_new to reset workflow history
                 workflow.logger.info("Resetting workflow history with continue_as_new...")
-                workflow.continue_as_new(cdp_url, continuous)
+                workflow.continue_as_new(args=[cdp_url, continuous])
 
             else:
                 # Not continuous mode: just return
