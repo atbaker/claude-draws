@@ -2,6 +2,8 @@
 	import type { PageData } from './$types';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import TabContainer from '$lib/components/TabContainer.svelte';
+	import VideoPlayer from '$lib/components/VideoPlayer.svelte';
 	import { copyToClipboard, getCanonicalUrl } from '$lib/utils/clipboard';
 
 	let { data }: { data: PageData } = $props();
@@ -91,15 +93,25 @@
 	<!-- Main Content -->
 	<main class="container mx-auto p-4 sm:p-8">
 		<div class="max-w-4xl mx-auto bg-kidpix-cyan border-4 border-black shadow-chunky-lg">
-			<!-- Image Container -->
+			<!-- Tabbed Media Container -->
 			<div class="bg-white border-b-4 border-black p-4 sm:p-8">
-				<div class="border-4 border-black bg-gray-100">
-					<img
-						src={artwork.imageUrl}
-						alt={artwork.title}
-						class="w-full h-auto mx-auto"
-					/>
-				</div>
+				<TabContainer hasVideo={!!artwork.videoUrl}>
+					{#snippet children()}
+						<div class="border-4 border-black bg-gray-100">
+							<img
+								src={artwork.imageUrl}
+								alt={artwork.title}
+								class="w-full h-auto mx-auto"
+							/>
+						</div>
+					{/snippet}
+
+					{#snippet videoContent()}
+						{#if artwork.videoUrl}
+							<VideoPlayer videoUrl={artwork.videoUrl} />
+						{/if}
+					{/snippet}
+				</TabContainer>
 			</div>
 
 			<!-- Content Container -->
@@ -171,23 +183,6 @@
 									{artwork.prompt}
 								</div>
 							</details>
-						</div>
-					{/if}
-
-					<!-- Video Link -->
-					{#if artwork.videoUrl}
-						<div class="bg-kidpix-purple border-4 border-black p-4 shadow-chunky">
-							<h2 class="text-lg font-black uppercase mb-2 text-white">
-								Creation Process
-							</h2>
-							<a
-								href={artwork.videoUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="inline-block bg-kidpix-red text-white font-bold text-base px-4 py-2 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
-							>
-								Watch Video →
-							</a>
 						</div>
 					{/if}
 				</div>
