@@ -4,29 +4,24 @@ This directory contains scripts for automated power management using Wake-on-LAN
 
 ## Architecture Overview
 
-The power management system has two main components:
+The power management system has three main components:
 
-1. **Sleep Monitor (Windows PC)** - PowerShell script that monitors artwork activity and triggers sleep after inactivity
-2. **WoL Monitor (Remote Server)** - Bash script that checks for pending submissions and sends WoL packets
+1. **System Status Endpoint** (Cloudflare Workers) - API endpoint at `/api/system-status` that queries D1 and returns wake/sleep status
+2. **Sleep Monitor** (Windows PC) - PowerShell script that checks the endpoint and triggers sleep after inactivity
+3. **WoL Monitor** (Remote Server) - Bash script that checks the endpoint and signals for Wake-on-LAN
+
+Both monitors now query a centralized endpoint instead of D1 directly, simplifying credential management and centralizing the power management logic.
 
 ## Component 1: Sleep Monitor (Windows PC)
 
 ### Prerequisites
 
 - Windows PC with PowerShell 5.1 or later
-- Cloudflare D1 database credentials (account ID, database ID, API token)
-- Backend `.env` file configured with Cloudflare credentials
+- Access to the Claude Draws gallery endpoint (default: https://claudedraws.com)
 
 ### Installation
 
-1. **Configure environment variables** in `backend/.env`:
-   ```
-   CLOUDFLARE_ACCOUNT_ID=your_account_id
-   D1_DATABASE_ID=your_database_id
-   CLOUDFLARE_API_TOKEN=your_api_token
-   ```
-
-2. **Run the installation script as Administrator**:
+1. **Run the installation script as Administrator**:
    ```powershell
    # Open PowerShell as Administrator
    cd backend\scripts
@@ -49,27 +44,32 @@ The power management system has two main components:
 
 ### Configuration
 
-The sleep monitor supports these parameters (edit in `install_sleep_monitor.ps1`):
+The sleep monitor supports these parameters (can be passed when running the script):
 
-- `InactivityMinutes` (default: 15) - Minutes of inactivity before triggering sleep
+- `GalleryUrl` (default: "https://claudedraws.com") - URL of the Claude Draws gallery site
 - `PollIntervalSeconds` (default: 60) - How often to check for activity
+
+The inactivity threshold (15 minutes) is hardcoded in the API endpoint.
 
 ### How It Works
 
 The sleep monitor runs continuously and:
 
-1. Every minute, queries D1 database to check:
-   - Are there any submissions with status = 'processing'?
-   - When was the last artwork completed?
-2. If no processing submissions AND last completion > 15 minutes ago:
+1. Every minute, calls the `/api/system-status` endpoint
+2. Endpoint returns a JSON response including `shouldSleep` boolean
+3. If `shouldSleep` is true:
    - Triggers Windows sleep via `SetSuspendState` API
-3. Logs all activity to `sleep_monitor.log`
+4. Logs all activity to `sleep_monitor.log`
+
+The endpoint determines `shouldSleep` based on:
+- No submissions with status = 'processing'
+- Last artwork completion > 15 minutes ago
 
 ### Troubleshooting
 
 **Sleep not triggering:**
 - Check logs: `Get-Content backend\scripts\sleep_monitor.log -Tail 50`
-- Verify D1 credentials are correct in `backend\.env`
+- Verify the gallery endpoint is accessible: `Invoke-RestMethod -Uri "https://claudedraws.com/api/system-status"`
 - Check Windows power settings allow sleep
 
 **Task not running:**
@@ -95,11 +95,11 @@ Remove-Item backend\scripts\sleep_monitor.log
 - Linux server on the same network as Windows PC (e.g., Home Assistant, Raspberry Pi)
 - `jq` package (for JSON parsing, usually pre-installed)
 - `curl` (usually pre-installed)
-- Cloudflare D1 database credentials
+- Access to the Claude Draws gallery endpoint (default: https://claudedraws.com)
 - PC's MAC address and Wake-on-LAN enabled in BIOS
 - **For Home Assistant**: The `wake_on_lan` integration (install via Configuration → Integrations)
 
-**Note**: The script checks D1 for pending submissions and returns an exit code. Home Assistant's `wake_on_lan` integration sends the actual WoL packet (avoiding network interface complexity in containerized environments).
+**Note**: The script checks the gallery endpoint for pending submissions and returns an exit code. Home Assistant's `wake_on_lan` integration sends the actual WoL packet (avoiding network interface complexity in containerized environments).
 
 ### Enable Wake-on-LAN on Windows PC
 
@@ -142,9 +142,7 @@ Remove-Item backend\scripts\sleep_monitor.log
    shell_command:
      check_claude_draws: >
        /config/scripts/wol_monitor.sh
-       --account-id your_cloudflare_account_id
-       --database-id your_d1_database_id
-       --api-token your_cloudflare_api_token
+       --gallery-url https://claudedraws.com
        --log-file /config/logs/wol_monitor.log
    ```
 
@@ -203,16 +201,19 @@ For non-Home Assistant environments, combine the check script with `wakeonlan` o
 The WoL monitor is a two-part system:
 
 **Part 1: Check Script** (`wol_monitor.sh`)
-1. Queries D1 database for pending submissions via REST API
-2. Returns exit code based on result:
-   - **Exit 0**: Pending submissions found → trigger WoL
-   - **Exit 1**: No pending submissions → no action
-   - **Exit 2**: Query error → check logs
+1. Calls the `/api/system-status` endpoint
+2. Parses the JSON response for the `shouldWake` boolean
+3. Returns exit code based on result:
+   - **Exit 0**: `shouldWake` is true → trigger WoL
+   - **Exit 1**: `shouldWake` is false → no action
+   - **Exit 2**: API error → check logs
 
 **Part 2: Wake-on-LAN** (Home Assistant integration)
 1. Home Assistant automation runs the check script every 30 seconds
 2. If exit code is 0, Home Assistant's `wake_on_lan` integration sends the magic packet
 3. PC wakes up and resumes Temporal workflow
+
+The endpoint determines `shouldWake` based on pending submission count (> 0 means wake needed).
 
 This two-part design avoids network interface issues in containerized environments.
 
@@ -220,9 +221,7 @@ This two-part design avoids network interface issues in containerized environmen
 
 Environment variables / command-line arguments:
 
-- `CLOUDFLARE_ACCOUNT_ID` / `--account-id` (required) - Cloudflare account ID
-- `D1_DATABASE_ID` / `--database-id` (required) - D1 database ID
-- `CLOUDFLARE_API_TOKEN` / `--api-token` (required) - Cloudflare API token
+- `GALLERY_URL` / `--gallery-url` (default: https://claudedraws.com) - URL of the Claude Draws gallery site
 - `WOL_LOG_FILE` / `--log-file` (default: /tmp/claude-draws-wol-monitor.log) - Log file path
 
 ### Troubleshooting
@@ -238,14 +237,11 @@ Environment variables / command-line arguments:
 
 **Script not finding pending submissions:**
 - Check the script logs: `tail -50 /config/logs/wol_monitor.log`
-- Verify D1 credentials are correct in `configuration.yaml`
-- Test D1 query manually from Home Assistant Terminal add-on:
+- Test the endpoint manually from Home Assistant Terminal add-on:
   ```bash
-  curl -X POST "https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT/d1/database/YOUR_DB/query" \
-    -H "Authorization: Bearer YOUR_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d '{"sql":"SELECT COUNT(*) as count FROM submissions WHERE status = '\''pending'\''"}'
+  curl -s https://claudedraws.com/api/system-status | jq
   ```
+- Verify the endpoint is accessible and returns valid JSON
 - Check automation is running: Configuration → Automations & Scenes
 
 **Automation not triggering:**
@@ -327,7 +323,7 @@ sudo rm /var/log/claude-draws-wol-monitor.log
 
 ## Security Considerations
 
-- Store API tokens securely (use environment files with restricted permissions)
-- Consider using Cloudflare API tokens with minimal scopes (only D1 read access needed)
+- The system status endpoint is public and does not require authentication
 - WoL packets are not encrypted - ensure trusted network environment
-- Sleep monitor logs may contain sensitive information - restrict access appropriately
+- Monitor logs may contain submission details - restrict access appropriately
+- Consider rate limiting the `/api/system-status` endpoint if needed

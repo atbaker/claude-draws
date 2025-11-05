@@ -14,7 +14,7 @@ if (-not $isAdmin) {
 # Configuration
 $TaskName = "ClaudeDraws-SleepMonitor"
 $ScriptPath = Join-Path $PSScriptRoot "sleep_monitor.ps1"
-$InactivityMinutes = 15
+$GalleryUrl = "https://claudedraws.com"
 $PollIntervalSeconds = 60
 
 Write-Host "=========================================="
@@ -30,8 +30,9 @@ if (-not (Test-Path $ScriptPath)) {
 
 Write-Host "Script path: $ScriptPath" -ForegroundColor Cyan
 Write-Host "Task name: $TaskName" -ForegroundColor Cyan
-Write-Host "Inactivity threshold: $InactivityMinutes minutes" -ForegroundColor Cyan
+Write-Host "Gallery URL: $GalleryUrl" -ForegroundColor Cyan
 Write-Host "Poll interval: $PollIntervalSeconds seconds" -ForegroundColor Cyan
+Write-Host "Inactivity threshold: 15 minutes (configured in API endpoint)" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if task already exists
@@ -48,7 +49,7 @@ Write-Host "Creating scheduled task..." -ForegroundColor Cyan
 # Action: Run PowerShell with the sleep monitor script
 $action = New-ScheduledTaskAction `
     -Execute "PowerShell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -InactivityMinutes $InactivityMinutes -PollIntervalSeconds $PollIntervalSeconds" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -GalleryUrl `"$GalleryUrl`" -PollIntervalSeconds $PollIntervalSeconds" `
     -WorkingDirectory $PSScriptRoot
 
 # Trigger: At system startup

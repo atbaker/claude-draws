@@ -2,8 +2,7 @@
 # Monitors artwork activity and triggers Windows sleep after inactivity threshold
 
 param(
-    [string]$EnvFile = "..\\backend\\.env",
-    [int]$InactivityMinutes = 15,
+    [string]$GalleryUrl = "https://claudedraws.com",
     [int]$PollIntervalSeconds = 60
 )
 
@@ -18,112 +17,42 @@ function Write-Log {
     Add-Content -Path $LogFile -Value $logMessage
 }
 
-function Load-EnvFile {
-    param([string]$Path)
-
-    if (-not (Test-Path $Path)) {
-        Write-Log "ERROR: Environment file not found: $Path"
-        exit 1
-    }
-
-    Write-Log "Loading environment from: $Path"
-    Get-Content $Path | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
-            $name = $matches[1].Trim()
-            $value = $matches[2].Trim()
-            [Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
-}
-
-function Invoke-D1Query {
-    param([string]$Query)
-
-    $accountId = [Environment]::GetEnvironmentVariable("CLOUDFLARE_ACCOUNT_ID")
-    $databaseId = [Environment]::GetEnvironmentVariable("D1_DATABASE_ID")
-    $apiToken = [Environment]::GetEnvironmentVariable("CLOUDFLARE_API_TOKEN")
-
-    if (-not $accountId -or -not $databaseId -or -not $apiToken) {
-        Write-Log "ERROR: Missing required environment variables (CLOUDFLARE_ACCOUNT_ID, D1_DATABASE_ID, CLOUDFLARE_API_TOKEN)"
-        return $null
-    }
-
-    $uri = "https://api.cloudflare.com/client/v4/accounts/$accountId/d1/database/$databaseId/query"
-    $headers = @{
-        "Authorization" = "Bearer $apiToken"
-        "Content-Type" = "application/json"
-    }
-    $body = @{
-        "sql" = $Query
-    } | ConvertTo-Json
-
-    try {
-        $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body
-        if ($response.success) {
-            return $response.result[0]
-        } else {
-            Write-Log "ERROR: D1 query failed: $($response.errors | ConvertTo-Json -Compress)"
-            return $null
-        }
-    } catch {
-        Write-Log "ERROR: Failed to query D1: $_"
-        return $null
-    }
-}
-
 function Test-ShouldSleep {
-    param([int]$InactivityMinutes)
+    param([string]$GalleryUrl)
 
-    # Check 1: Are there any submissions currently being processed?
-    Write-Log "Checking for in-progress submissions..."
-    $processingQuery = "SELECT COUNT(*) as count FROM submissions WHERE status = 'processing'"
-    $processingResult = Invoke-D1Query -Query $processingQuery
+    Write-Log "Checking system status from $GalleryUrl/api/system-status..."
 
-    if ($null -eq $processingResult) {
-        Write-Log "ERROR: Could not check processing status"
-        return $false
-    }
-
-    $processingCount = $processingResult.results[0].count
-    if ($processingCount -gt 0) {
-        Write-Log "Found $processingCount submission(s) in progress - not sleeping"
-        return $false
-    }
-
-    Write-Log "No submissions in progress"
-
-    # Check 2: When was the last artwork completed?
-    Write-Log "Checking time since last completed artwork..."
-    $completedQuery = "SELECT MAX(completed_at) as last_completed FROM submissions WHERE status = 'completed'"
-    $completedResult = Invoke-D1Query -Query $completedQuery
-
-    if ($null -eq $completedResult) {
-        Write-Log "ERROR: Could not check completion status"
-        return $false
-    }
-
-    $lastCompleted = $completedResult.results[0].last_completed
-    if ($null -eq $lastCompleted) {
-        Write-Log "No completed artworks found - not sleeping"
-        return $false
-    }
-
-    # Parse ISO 8601 timestamp and calculate minutes since completion
     try {
-        $lastCompletedTime = [DateTime]::Parse($lastCompleted)
-        $minutesSinceCompletion = [Math]::Round(((Get-Date) - $lastCompletedTime).TotalMinutes, 1)
+        $response = Invoke-RestMethod -Uri "$GalleryUrl/api/system-status" -Method Get
 
-        Write-Log "Last artwork completed $minutesSinceCompletion minutes ago (threshold: $InactivityMinutes minutes)"
+        # Check for error in response
+        if ($response.error) {
+            Write-Log "ERROR: API returned error: $($response.error)"
+            return $false
+        }
 
-        if ($minutesSinceCompletion -ge $InactivityMinutes) {
-            Write-Log "Inactivity threshold exceeded - ready to sleep"
+        # Extract status information
+        $shouldSleep = $response.shouldSleep
+        $processingCount = $response.processingCount
+        $minutesSinceLastCompleted = $response.minutesSinceLastCompleted
+
+        # Log detailed status
+        Write-Log "Processing count: $processingCount"
+        if ($null -ne $minutesSinceLastCompleted) {
+            Write-Log "Minutes since last completed: $minutesSinceLastCompleted"
+        } else {
+            Write-Log "No completed artworks found"
+        }
+
+        if ($shouldSleep) {
+            Write-Log "System status indicates sleep is appropriate"
             return $true
         } else {
-            Write-Log "Below inactivity threshold - not sleeping yet"
+            Write-Log "System status indicates PC should remain active"
             return $false
         }
     } catch {
-        Write-Log "ERROR: Could not parse completion timestamp: $_"
+        Write-Log "ERROR: Failed to fetch system status: $_"
         return $false
     }
 }
@@ -153,17 +82,13 @@ function Invoke-Sleep {
 Write-Log "=========================================="
 Write-Log "Claude Draws - Sleep Monitor Started"
 Write-Log "=========================================="
-Write-Log "Inactivity threshold: $InactivityMinutes minutes"
+Write-Log "Gallery URL: $GalleryUrl"
 Write-Log "Poll interval: $PollIntervalSeconds seconds"
-
-# Load environment variables
-Load-EnvFile -Path $EnvFile
-
 Write-Log "Starting monitoring loop..."
 
 while ($true) {
     try {
-        if (Test-ShouldSleep -InactivityMinutes $InactivityMinutes) {
+        if (Test-ShouldSleep -GalleryUrl $GalleryUrl) {
             Invoke-Sleep
             # If we reach here, sleep failed or was cancelled
             Write-Log "Sleep was triggered but PC is still awake - continuing monitoring"
