@@ -952,7 +952,7 @@ async def start_obs_recording() -> None:
                 "PROJECT_HOST_DIR",
                 str(RECORDINGS_DIR.parent.parent)  # Fallback to container path for dev
             )
-            host_recording_dir = f"{project_host_dir}/downloads/recordings"
+            host_recording_dir = str(Path(project_host_dir) / "downloads" / "recordings")
 
             activity.logger.info(f"Setting OBS recording directory to: {host_recording_dir}")
             await obs.set_record_directory(host_recording_dir)
@@ -1065,7 +1065,7 @@ async def rotate_screensaver_video(last_video_index: int = -1) -> int:
             "PROJECT_HOST_DIR",
             str(BACKEND_ROOT.parent)  # Fallback to container path for dev
         )
-        video_host_path = f"{project_host_dir}/obs/{selected_video}"
+        video_host_path = str(Path(project_host_dir) / "obs" / selected_video)
 
         activity.logger.info(f"Video host path: {video_host_path}")
 
