@@ -1142,10 +1142,12 @@ async def compress_video(video_path: str) -> str:
     if not video_path_obj.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    # Output path: replace extension with .mp4
-    output_path = video_path_obj.with_suffix('.mp4')
+    # Output path: use temporary filename to avoid overwriting input if it's already .mp4
+    # Create path like: "2025-11-05 01-24-18-compressed.mp4"
+    temp_output_path = video_path_obj.with_stem(f"{video_path_obj.stem}-compressed").with_suffix('.mp4')
+    final_output_path = video_path_obj.with_suffix('.mp4')
 
-    activity.logger.info(f"Output path: {output_path}")
+    activity.logger.info(f"Temporary output path: {temp_output_path}")
 
     # Get input file size for logging
     input_size_mb = video_path_obj.stat().st_size / (1024 * 1024)
@@ -1165,8 +1167,8 @@ async def compress_video(video_path: str) -> str:
                 activity.logger.info(f"Input audio: {input_audio.codec_context.name}, "
                                    f"{input_audio.rate} Hz, {input_audio.channels} channels")
 
-            # Open output container
-            with av.open(str(output_path), 'w') as output_container:
+            # Open output container (use temporary path to avoid overwriting input)
+            with av.open(str(temp_output_path), 'w') as output_container:
                 # Configure output video stream (H.264)
                 output_video = output_container.add_stream('libx264', rate=input_video.average_rate)
                 output_video.width = input_video.width
@@ -1243,26 +1245,35 @@ async def compress_video(video_path: str) -> str:
                 for encoded_packet in output_video.encode():
                     output_container.mux(encoded_packet)
 
-        # Verify output file exists
-        if not output_path.exists():
-            raise FileNotFoundError(f"Compressed file not created: {output_path}")
+        # Verify temporary compressed file was created
+        if not temp_output_path.exists():
+            raise FileNotFoundError(f"Compressed file not created: {temp_output_path}")
 
         # Get output file size and calculate reduction
-        output_size_mb = output_path.stat().st_size / (1024 * 1024)
+        output_size_mb = temp_output_path.stat().st_size / (1024 * 1024)
         reduction_pct = ((input_size_mb - output_size_mb) / input_size_mb) * 100
 
         activity.logger.info(f"✓ Compression complete!")
         activity.logger.info(f"  Output size: {output_size_mb:.2f} MB")
         activity.logger.info(f"  Reduction: {reduction_pct:.1f}%")
 
-        # Delete original uncompressed file
-        try:
-            video_path_obj.unlink()
-            activity.logger.info(f"✓ Deleted original file: {video_path}")
-        except Exception as e:
-            activity.logger.warning(f"⚠ Failed to delete original file: {e}")
+        # Delete original uncompressed file (if different from final output path)
+        if video_path_obj != final_output_path:
+            try:
+                video_path_obj.unlink()
+                activity.logger.info(f"✓ Deleted original file: {video_path}")
+            except Exception as e:
+                activity.logger.warning(f"⚠ Failed to delete original file: {e}")
 
-        return str(output_path)
+        # Rename temporary file to final output path
+        try:
+            temp_output_path.rename(final_output_path)
+            activity.logger.info(f"✓ Renamed compressed file to: {final_output_path}")
+        except Exception as e:
+            activity.logger.error(f"✗ Failed to rename compressed file: {e}")
+            raise
+
+        return str(final_output_path)
 
     except Exception as e:
         activity.logger.error(f"✗ Error compressing video: {e}")
