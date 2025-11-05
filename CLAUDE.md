@@ -8,13 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **Web form** (claudedraws.com/submit) accepts art requests and stores them in Cloudflare D1
 2. **Browser automation** (Playwright + CDP) submits prompts to Claude for Chrome extension
-3. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
-4. **Temporal workflows** orchestrate the post-processing pipeline
-5. **BAML extraction** parses Claude's title and artist statement from the final response
-6. **Cloudflare R2** stores artwork images
-7. **Cloudflare D1** stores artwork metadata in SQLite database
-8. **SvelteKit gallery** (`gallery/`) displays all artworks at claudedraws.com with SSR-on-demand
-9. **Cloudflare Workers** hosts the gallery site
+3. **OBS recording** captures the entire artwork creation process via WebSocket control
+4. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
+5. **Temporal workflows** orchestrate the post-processing pipeline
+6. **BAML extraction** parses Claude's title and artist statement from the final response
+7. **Cloudflare R2** stores artwork images and creation videos
+8. **Cloudflare D1** stores artwork metadata (including video URLs) in SQLite database
+9. **SvelteKit gallery** (`gallery/`) displays all artworks with videos at claudedraws.com with SSR-on-demand
+10. **Cloudflare Workers** hosts the gallery site
 
 ### Repository Structure (Monorepo)
 
@@ -52,17 +53,24 @@ claude-draws/
 
 The workflow handles the **complete end-to-end process**:
 
-1. **Browser automation** - Finds pending submission from D1, submits to Claude, waits for completion
-2. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
-3. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket with public access
-4. **Inserts metadata into D1** - Stores artwork metadata in D1 database (artwork appears immediately in gallery)
-5. **Sends email notification** - Notifies requester when artwork is ready (if email provided)
-6. **Schedules next workflow** (continuous mode only) - Enables livestream operation
+1. **Starts OBS recording** - Begins recording the artwork creation process for the gallery
+2. **Browser automation** - Finds pending submission from D1, submits to Claude, waits for completion
+3. **Stops OBS recording** - Ends recording and retrieves video file path
+4. **Extracts metadata** using BAML - Parses Claude's HTML response to extract artwork title and artist statement
+5. **Uploads image to R2** - Stores PNG file in Cloudflare R2 bucket with public access
+6. **Uploads video to R2** - Stores MKV/MP4 recording in R2 bucket with public access
+7. **Inserts metadata into D1** - Stores artwork metadata (including video URL) in D1 database (artwork appears immediately in gallery)
+8. **Sends email notification** - Notifies requester when artwork is ready (if email provided)
+9. **Schedules next workflow** (continuous mode only) - Enables livestream operation
 
 **Key activities** in `backend/workflows/activities.py`:
+- `start_obs_recording()` - Starts OBS recording to the recordings directory
 - `browser_session_activity()` - Long-running activity that automates the browser (find submission → submit → wait → download)
+- `stop_obs_recording()` - Stops OBS recording and returns the video file path
+- `compress_video()` - Compresses video using PyAV (H.264, ~70-75% size reduction)
 - `extract_artwork_metadata()` - Uses BAML to parse Claude's response HTML
 - `upload_image_to_r2()` - Uploads PNG to R2 with public access
+- `upload_video_to_r2()` - Uploads compressed video to R2 with public access
 - `insert_artwork_to_d1()` - Inserts artwork metadata into D1 database
 - `send_email_notification()` - Sends completion email to requester (if email provided)
 
@@ -92,6 +100,13 @@ The workflow handles the **complete end-to-end process**:
 - Easy to add new steps (e.g., video processing, social media posting)
 - Continuous mode support for livestreaming
 
+**CRITICAL: Activity Registration**
+When adding new Temporal activities, you MUST register them in TWO places:
+1. Import in `backend/worker/main.py` (line 15-33)
+2. Add to `activities=[...]` list in Worker constructor (line 61-78)
+
+Without both steps, the worker will fail with: `Activity function <name> is not registered on this worker`
+
 ### BAML Integration
 
 **BAML** (Bounded Automation Markup Language) is used to reliably extract structured data from Claude's unstructured HTML responses.
@@ -103,6 +118,54 @@ The BAML function `ExtractArtworkMetadata` takes Claude's final HTML response an
 - **Artist Statement**: Claude's description/explanation of the artwork
 
 This avoids fragile regex parsing and handles variations in Claude's response format automatically.
+
+### OBS Recording Integration
+
+The system automatically records each artwork creation process via OBS (Open Broadcaster Software) and uploads the videos to R2 for viewing in the gallery.
+
+**Architecture**:
+
+1. **OBS WebSocket Client** (`backend/workflows/obs_client.py`)
+   - Custom WebSocket client implementing OBS WebSocket Protocol v5
+   - Handles authentication, request/response, and event subscriptions
+   - Subscribes to Output events (512 bitmask) to capture recording state changes
+
+2. **Recording Workflow**:
+   - **Start**: Before browser automation begins, `start_obs_recording()` activity:
+     - Sets OBS recording directory to `downloads/recordings/` (via host OS path)
+     - Starts recording (with safety check to stop any existing recording)
+   - **During**: OBS records the entire artwork creation process (5-10 minutes)
+   - **Stop**: After browser automation completes, `stop_obs_recording()` activity:
+     - Stops recording and waits for `RecordStateChanged` event
+     - Event provides the host OS file path (e.g., Windows: `C:\...\downloads\recordings\2025-11-04 14-30-45.mkv` or macOS: `/Users/.../downloads/recordings/2025-11-04 14-30-45.mkv`)
+     - Converts host OS path to container path (`/app/downloads/recordings/...`)
+     - Verifies file exists in mounted volume
+   - **Compress**: `compress_video()` activity compresses the video using PyAV:
+     - Converts to H.264 MP4 with CRF 23 (excellent quality)
+     - AAC audio at 128 kbps
+     - Preserves original resolution (1280x720)
+     - Achieves ~70-75% file size reduction (e.g., 112 MB → 25-30 MB)
+     - Deletes original uncompressed file
+     - Processing time: 30-90 seconds
+   - **Upload**: `upload_video_to_r2()` activity uploads compressed video to R2 and cleans up local file
+
+3. **Key Technical Details**:
+   - **Event handling**: Client subscribes to recording events to capture the output file path when recording stops
+   - **Path translation**: Host OS paths from OBS are converted to Docker container paths using the mounted `downloads/` volume
+   - **PyAV compression**: Uses PyAV library (FFmpeg bindings) for frame-by-frame video transcoding - no system FFmpeg installation required
+   - **Error resilience**: Recording and compression failures do not block artwork creation - workflow continues without video
+   - **File cleanup**: Original uncompressed files deleted after successful compression; compressed files deleted after R2 upload
+   - **Video formats**: Input supports MKV (OBS default), MOV, and AVI; output is always H.264 MP4 with AAC audio
+
+4. **Configuration** (in `backend/.env`):
+   - `OBS_WEBSOCKET_URL` - WebSocket server URL (default: `ws://host.docker.internal:4444`)
+   - `OBS_WEBSOCKET_PASSWORD` - WebSocket authentication password
+   - `OBS_RECORDING_DIR` - Host OS path for recordings (e.g., Windows: `C:\Users\...\claude-draws\downloads\recordings`, macOS: `/Users/.../claude-draws/downloads/recordings`)
+
+5. **Gallery Integration**:
+   - Video URLs stored in D1 `artworks.video_url` column
+   - Gallery artwork detail pages (`/artwork/[id]`) display "Watch Video" link when available
+   - Videos are publicly accessible via R2 CDN
 
 ### Gallery Architecture
 
@@ -311,6 +374,9 @@ uv run baml-cli generate
   - `ADMIN_NOTIFICATION_EMAIL` - Admin email address for submission notifications
   - `TEMPORAL_HOST` - Temporal server address (default: `localhost:7233`)
   - `CHROME_CDP_URL` - Chrome DevTools Protocol WebSocket URL (get from `http://localhost:9222/json`)
+  - `OBS_WEBSOCKET_URL` - OBS WebSocket server URL (default: `ws://host.docker.internal:4444`)
+  - `OBS_WEBSOCKET_PASSWORD` - OBS WebSocket password
+  - `OBS_RECORDING_DIR` - Host OS path for OBS recordings (Windows: `C:\Users\...\claude-draws\downloads\recordings`, macOS: `/Users/.../claude-draws/downloads/recordings`)
 - **Cloudflare Workers environment variables**: The gallery submission API requires these environment variables in Cloudflare Workers (configure via `wrangler secret put` or Cloudflare dashboard):
   - `RESEND_API_KEY` - Resend API key (same as backend)
   - `ADMIN_NOTIFICATION_EMAIL` - Admin email address (same as backend)

@@ -65,10 +65,25 @@ OBS_WEBSOCKET_PASSWORD = os.getenv("OBS_WEBSOCKET_PASSWORD", "")
 OBS_MAIN_SCENE = os.getenv("OBS_MAIN_SCENE", "Main Scene")
 OBS_SCREENSAVER_SCENE = os.getenv("OBS_SCREENSAVER_SCENE", "Screensaver")
 OBS_COUNTDOWN_TEXT_SOURCE = os.getenv("OBS_COUNTDOWN_TEXT_SOURCE", "CountdownTimer")
+OBS_SCREENSAVER_MEDIA_SOURCE = os.getenv("OBS_SCREENSAVER_MEDIA_SOURCE", "After Dark - Nocturnes")
+
+# Screensaver video files (in obs/ directory)
+SCREENSAVER_VIDEOS = [
+    "after-dark-bad-dog.mp4",
+    "after-dark-fish.mp4",
+    "after-dark-flying-toasters.mp4",
+    "after-dark-nocturne.mp4",
+    "after-dark-rat-race.mp4",
+]
 
 # Paths
 BACKEND_ROOT = Path(__file__).parent.parent  # /app/backend
 GALLERY_DIR = BACKEND_ROOT.parent / "gallery"  # /app/gallery
+DOWNLOADS_DIR = BACKEND_ROOT.parent / "downloads"  # /app/downloads
+RECORDINGS_DIR = DOWNLOADS_DIR / "recordings"  # /app/downloads/recordings
+
+# Ensure recordings directory exists
+RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class BrowserSessionResult(BaseModel):
@@ -904,6 +919,399 @@ async def check_inactivity_and_stop_streaming(inactivity_threshold_minutes: int 
         raise
     except Exception as e:
         activity.logger.error(f"✗ Unexpected error checking inactivity: {e}")
+        raise
+
+
+@activity.defn
+async def start_obs_recording() -> None:
+    """
+    Start OBS recording for the current artwork creation process.
+
+    Sets the recording directory to RECORDINGS_DIR and starts recording.
+    Includes safety checks to ensure OBS is not already recording.
+
+    Raises:
+        OBSWebSocketError: If recording start fails (workflow will fail)
+    """
+    activity.logger.info("Starting OBS recording for artwork creation...")
+
+    try:
+        async with OBSWebSocketClient(
+            url=OBS_WEBSOCKET_URL,
+            password=OBS_WEBSOCKET_PASSWORD,
+        ) as obs:
+            # Set recording directory (OBS expects host OS path)
+            # The RECORDINGS_DIR path is the container path (/app/downloads/recordings)
+            # We need to convert it to the host OS path
+            # Since downloads is mounted as a volume, the host path corresponds to the container path
+
+            # OBS runs on the host OS and needs the host OS path to the recordings directory
+            # The container path /app/downloads/recordings maps to the host path
+            # We use PROJECT_HOST_DIR and append the relative path
+            project_host_dir = os.getenv(
+                "PROJECT_HOST_DIR",
+                str(RECORDINGS_DIR.parent.parent)  # Fallback to container path for dev
+            )
+            host_recording_dir = f"{project_host_dir}/downloads/recordings"
+
+            activity.logger.info(f"Setting OBS recording directory to: {host_recording_dir}")
+            await obs.set_record_directory(host_recording_dir)
+
+            # Start recording (includes safety check for existing recordings)
+            await obs.start_record()
+            activity.logger.info("✓ OBS recording started successfully")
+
+    except OBSWebSocketError as e:
+        activity.logger.error(f"✗ Failed to start OBS recording: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error starting OBS recording: {e}")
+        raise OBSWebSocketError(f"Unexpected error: {e}")
+
+
+@activity.defn
+async def stop_obs_recording() -> Optional[str]:
+    """
+    Stop OBS recording and return the path to the recorded video file.
+
+    Waits for the RecordStateChanged event to capture the output file path.
+    The returned path will be a host OS path that needs to be converted
+    to the container path for further processing.
+
+    Returns:
+        str: Absolute path to the recorded video file (container path),
+             or None if path could not be determined
+
+    Raises:
+        OBSWebSocketError: If recording stop fails (workflow will fail)
+    """
+    activity.logger.info("Stopping OBS recording...")
+
+    try:
+        async with OBSWebSocketClient(
+            url=OBS_WEBSOCKET_URL,
+            password=OBS_WEBSOCKET_PASSWORD,
+            timeout=30.0,  # Longer timeout for recording to finalize
+        ) as obs:
+            # Stop recording and wait for the file path
+            host_path = await obs.stop_record(timeout=30.0)
+
+            if not host_path:
+                activity.logger.error("✗ Failed to get recording file path from OBS")
+                return None
+
+            activity.logger.info(f"✓ Recording stopped. Host OS path: {host_path}")
+
+            # Convert host OS path to container path
+            # OBS returns a host OS path like:
+            #   Windows: C:\Users\...\claude-draws\downloads\recordings\2025-11-04 14-30-45.mkv
+            #   macOS: /Users/.../claude-draws/downloads/recordings/2025-11-04 14-30-45.mkv
+            # We need to convert it to: /app/downloads/recordings/2025-11-04 14-30-45.mkv
+
+            # Extract just the filename
+            filename = Path(host_path).name
+            container_path = RECORDINGS_DIR / filename
+
+            activity.logger.info(f"Container path: {container_path}")
+
+            # Verify the file exists (it should be accessible via the mounted volume)
+            if not container_path.exists():
+                activity.logger.warning(f"⚠ Recording file not found at {container_path}. Waiting 5 seconds...")
+                await asyncio.sleep(5)  # Give file system time to sync
+
+                if not container_path.exists():
+                    activity.logger.error(f"✗ Recording file still not found at {container_path}")
+                    return None
+
+            activity.logger.info(f"✓ Recording file confirmed at: {container_path}")
+            return str(container_path)
+
+    except OBSWebSocketError as e:
+        activity.logger.error(f"✗ Failed to stop OBS recording: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error stopping OBS recording: {e}")
+        raise OBSWebSocketError(f"Unexpected error: {e}")
+
+
+@activity.defn
+async def rotate_screensaver_video(last_video_index: int = -1) -> int:
+    """
+    Rotate to the next screensaver video in the After Dark collection.
+
+    Uses round-robin selection to cycle through all available screensaver videos.
+    Updates the OBS media source to display the selected video.
+
+    Args:
+        last_video_index: Index of the last video shown (-1 for first time)
+
+    Returns:
+        int: Index of the video that was just set (to be passed on next call)
+
+    Raises:
+        OBSWebSocketError: If media source update fails (workflow will fail)
+    """
+    activity.logger.info("Rotating screensaver video...")
+
+    try:
+        # Calculate next video index (round-robin)
+        next_index = (last_video_index + 1) % len(SCREENSAVER_VIDEOS)
+        selected_video = SCREENSAVER_VIDEOS[next_index]
+
+        activity.logger.info(f"Selected screensaver video [{next_index + 1}/{len(SCREENSAVER_VIDEOS)}]: {selected_video}")
+
+        # Build host OS path: PROJECT_HOST_DIR/obs/{filename}
+        project_host_dir = os.getenv(
+            "PROJECT_HOST_DIR",
+            str(BACKEND_ROOT.parent)  # Fallback to container path for dev
+        )
+        video_host_path = f"{project_host_dir}/obs/{selected_video}"
+
+        activity.logger.info(f"Video host path: {video_host_path}")
+
+        # Update OBS media source
+        async with OBSWebSocketClient(
+            url=OBS_WEBSOCKET_URL,
+            password=OBS_WEBSOCKET_PASSWORD,
+        ) as obs:
+            await obs.update_media_source(
+                input_name=OBS_SCREENSAVER_MEDIA_SOURCE,
+                file_path=video_host_path,
+                overlay=True  # Only update file path, preserve other settings
+            )
+
+        activity.logger.info(f"✓ Screensaver video updated to: {selected_video}")
+        return next_index
+
+    except OBSWebSocketError as e:
+        activity.logger.error(f"✗ Failed to rotate screensaver video: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error rotating screensaver video: {e}")
+        raise OBSWebSocketError(f"Unexpected error: {e}")
+
+
+@activity.defn
+async def compress_video(video_path: str) -> str:
+    """
+    Compress video file using PyAV (H.264 + AAC).
+
+    Converts OBS recordings (.mov, .mkv) to compressed H.264 MP4:
+    - Video: H.264 codec, CRF 23, medium preset, preserves original resolution
+    - Audio: AAC codec, 128 kbps, stereo
+    - Target: ~70-75% file size reduction
+
+    Args:
+        video_path: Path to input video file (e.g., "/app/downloads/recordings/video.mov")
+
+    Returns:
+        str: Path to compressed output file (e.g., "/app/downloads/recordings/video.mp4")
+
+    Raises:
+        FileNotFoundError: If input file doesn't exist
+        Exception: If compression fails (workflow will fail)
+    """
+    import av
+
+    activity.logger.info(f"Compressing video: {video_path}")
+
+    video_path_obj = Path(video_path)
+    if not video_path_obj.exists():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    # Output path: replace extension with .mp4
+    output_path = video_path_obj.with_suffix('.mp4')
+
+    activity.logger.info(f"Output path: {output_path}")
+
+    # Get input file size for logging
+    input_size_mb = video_path_obj.stat().st_size / (1024 * 1024)
+    activity.logger.info(f"Input file size: {input_size_mb:.2f} MB")
+
+    try:
+        # Open input container
+        with av.open(str(video_path)) as input_container:
+            # Get input streams
+            input_video = input_container.streams.video[0]
+            input_audio = input_container.streams.audio[0] if input_container.streams.audio else None
+
+            activity.logger.info(f"Input video: {input_video.codec_context.name}, "
+                               f"{input_video.width}x{input_video.height}, "
+                               f"{input_video.average_rate} fps")
+            if input_audio:
+                activity.logger.info(f"Input audio: {input_audio.codec_context.name}, "
+                                   f"{input_audio.rate} Hz, {input_audio.channels} channels")
+
+            # Open output container
+            with av.open(str(output_path), 'w') as output_container:
+                # Configure output video stream (H.264)
+                output_video = output_container.add_stream('libx264', rate=input_video.average_rate)
+                output_video.width = input_video.width
+                output_video.height = input_video.height
+                output_video.pix_fmt = 'yuv420p'
+
+                # H.264 encoding options for screen recording compression
+                # Optimized for text legibility in Kid Pix browser UI
+                output_video.codec_context.options = {
+                    'crf': '20',           # High quality for text clarity (lower=better, default=23)
+                    'preset': 'medium',    # Balanced encoding speed
+                    'tune': 'animation',   # Optimized for screen content with flat color areas
+                }
+
+                activity.logger.info(f"Output video configured: H.264, {output_video.width}x{output_video.height}, CRF 20, medium preset, tune=animation")
+
+                # Configure output audio stream (AAC)
+                output_audio = None
+                if input_audio:
+                    output_audio = output_container.add_stream('aac', rate=44100, layout='stereo')
+                    output_audio.codec_context.bit_rate = 128000  # 128 kbps
+                    activity.logger.info("Output audio configured: AAC, 44.1 kHz, stereo, 128 kbps")
+
+                # Transcode video frames
+                activity.logger.info("Transcoding video...")
+                frame_count = 0
+                for packet in input_container.demux(input_video):
+                    for frame in packet.decode():
+                        # Reformat frame to output pixel format
+                        frame = frame.reformat(format=output_video.pix_fmt)
+
+                        # Encode and mux
+                        for encoded_packet in output_video.encode(frame):
+                            output_container.mux(encoded_packet)
+
+                        frame_count += 1
+                        if frame_count % 100 == 0:
+                            activity.logger.debug(f"Processed {frame_count} video frames...")
+
+                activity.logger.info(f"✓ Transcoded {frame_count} video frames")
+
+                # Transcode audio frames
+                if input_audio and output_audio:
+                    activity.logger.info("Transcoding audio...")
+
+                    # Create audio resampler to convert to output format
+                    resampler = av.AudioResampler(
+                        format=output_audio.format.name,
+                        layout='stereo',
+                        rate=44100
+                    )
+
+                    audio_frame_count = 0
+                    for packet in input_container.demux(input_audio):
+                        for frame in packet.decode():
+                            # Resample to match output stream configuration
+                            resampled_frames = resampler.resample(frame)
+
+                            for resampled_frame in resampled_frames:
+                                resampled_frame.pts = None  # Let encoder assign timestamps
+
+                                for encoded_packet in output_audio.encode(resampled_frame):
+                                    output_container.mux(encoded_packet)
+
+                                audio_frame_count += 1
+
+                    activity.logger.info(f"✓ Transcoded {audio_frame_count} audio frames")
+
+                    # Flush audio encoder
+                    for encoded_packet in output_audio.encode():
+                        output_container.mux(encoded_packet)
+
+                # Flush video encoder
+                for encoded_packet in output_video.encode():
+                    output_container.mux(encoded_packet)
+
+        # Verify output file exists
+        if not output_path.exists():
+            raise FileNotFoundError(f"Compressed file not created: {output_path}")
+
+        # Get output file size and calculate reduction
+        output_size_mb = output_path.stat().st_size / (1024 * 1024)
+        reduction_pct = ((input_size_mb - output_size_mb) / input_size_mb) * 100
+
+        activity.logger.info(f"✓ Compression complete!")
+        activity.logger.info(f"  Output size: {output_size_mb:.2f} MB")
+        activity.logger.info(f"  Reduction: {reduction_pct:.1f}%")
+
+        # Delete original uncompressed file
+        try:
+            video_path_obj.unlink()
+            activity.logger.info(f"✓ Deleted original file: {video_path}")
+        except Exception as e:
+            activity.logger.warning(f"⚠ Failed to delete original file: {e}")
+
+        return str(output_path)
+
+    except Exception as e:
+        activity.logger.error(f"✗ Error compressing video: {e}")
+        raise
+
+
+@activity.defn
+async def upload_video_to_r2(artwork_id: str, video_path: str) -> str:
+    """
+    Upload artwork creation video to Cloudflare R2.
+
+    Args:
+        artwork_id: Unique identifier for the artwork (e.g., "claudedraws-1730736645")
+        video_path: Absolute path to the video file (e.g., "/app/downloads/recordings/2025-11-04 14-30-45.mkv")
+
+    Returns:
+        str: Public URL of the uploaded video
+
+    Raises:
+        Exception: If upload fails (workflow will fail)
+    """
+    activity.logger.info(f"Uploading video to R2: {video_path}")
+
+    try:
+        client = get_r2_client()
+        video_path_obj = Path(video_path)
+
+        if not video_path_obj.exists():
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+
+        # Get file extension (.mkv, .mp4, etc.)
+        ext = video_path_obj.suffix.lower()
+
+        # Determine content type
+        content_type_map = {
+            ".mkv": "video/x-matroska",
+            ".mp4": "video/mp4",
+            ".mov": "video/quicktime",
+            ".avi": "video/x-msvideo",
+        }
+        content_type = content_type_map.get(ext, "video/x-matroska")
+
+        # Upload to R2 with artwork ID as key
+        r2_key = f"{artwork_id}{ext}"
+
+        activity.logger.info(f"Uploading to R2 bucket '{R2_BUCKET_NAME}' with key '{r2_key}'...")
+
+        with open(video_path, "rb") as f:
+            client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=r2_key,
+                Body=f,
+                ContentType=content_type,
+            )
+
+        video_url = f"{R2_PUBLIC_URL}/{r2_key}"
+        activity.logger.info(f"✓ Video uploaded successfully: {video_url}")
+
+        # Clean up local video file after successful upload
+        try:
+            video_path_obj.unlink()
+            activity.logger.info(f"✓ Local video file deleted: {video_path}")
+        except Exception as e:
+            activity.logger.warning(f"⚠ Failed to delete local video file: {e}")
+
+        return video_url
+
+    except ClientError as e:
+        activity.logger.error(f"✗ R2 upload failed: {e}")
+        raise
+    except Exception as e:
+        activity.logger.error(f"✗ Unexpected error uploading video: {e}")
         raise
 
 

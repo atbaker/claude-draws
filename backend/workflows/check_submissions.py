@@ -12,6 +12,7 @@ with workflow.unsafe.imports_passed_through():
         check_for_pending_submissions,
         check_inactivity_and_stop_streaming,
         ensure_obs_streaming,
+        rotate_screensaver_video,
         switch_obs_scene,
         update_countdown_text,
         visit_gallery_activity,
@@ -49,7 +50,7 @@ class CheckSubmissionsWorkflow:
     """
 
     @workflow.run
-    async def run(self, cdp_url: str, continuous: bool = False) -> dict:
+    async def run(self, cdp_url: str, continuous: bool = False, last_screensaver_index: int = -1) -> dict:
         workflow.logger.info("Starting CheckSubmissionsWorkflow")
         workflow.logger.info(f"CDP URL: {cdp_url}")
         workflow.logger.info(f"Continuous mode: {continuous}")
@@ -68,12 +69,12 @@ class CheckSubmissionsWorkflow:
         workflow.logger.info(f"✓ Switched to main scene: {OBS_MAIN_SCENE}")
 
         # Ensure OBS is streaming (may need to restart after wake from sleep)
-        await workflow.execute_activity(
-            ensure_obs_streaming,
-            start_to_close_timeout=timedelta(seconds=15),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
-        workflow.logger.info("✓ OBS streaming confirmed")
+        # await workflow.execute_activity(
+        #     ensure_obs_streaming,
+        #     start_to_close_timeout=timedelta(seconds=15),
+        #     retry_policy=RetryPolicy(maximum_attempts=3),
+        # )
+        # workflow.logger.info("✓ OBS streaming confirmed")
 
         # Visit gallery homepage for 5 seconds (shows on livestream)
         await workflow.execute_activity(
@@ -123,7 +124,7 @@ class CheckSubmissionsWorkflow:
             # If continuous mode, use continue_as_new to reset workflow history
             if continuous:
                 workflow.logger.info("Continuous mode: resetting workflow history with continue_as_new...")
-                workflow.continue_as_new(args=[cdp_url, continuous])
+                workflow.continue_as_new(args=[cdp_url, continuous, last_screensaver_index])
 
             # Return result (only reached if not continuous mode)
             return {
@@ -139,6 +140,15 @@ class CheckSubmissionsWorkflow:
             if continuous:
                 # In continuous mode: show screensaver countdown then schedule next check
                 workflow.logger.info("Switching to screensaver...")
+
+                # Rotate to next screensaver video
+                new_screensaver_index = await workflow.execute_activity(
+                    rotate_screensaver_video,
+                    args=[last_screensaver_index],
+                    start_to_close_timeout=timedelta(seconds=15),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
+                )
+                workflow.logger.info(f"✓ Rotated screensaver video (index: {new_screensaver_index})")
 
                 # Switch to screensaver scene
                 await workflow.execute_activity(
@@ -184,7 +194,7 @@ class CheckSubmissionsWorkflow:
 
                 # Use continue_as_new to reset workflow history
                 workflow.logger.info("Resetting workflow history with continue_as_new...")
-                workflow.continue_as_new(args=[cdp_url, continuous])
+                workflow.continue_as_new(args=[cdp_url, continuous, new_screensaver_index])
 
             else:
                 # Not continuous mode: just return

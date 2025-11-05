@@ -61,6 +61,11 @@ class OBSWebSocketClient:
         self._hello_data: Optional[Dict] = None
         self._receive_task: Optional[asyncio.Task] = None
 
+        # Event storage for recording events
+        self._recording_events: asyncio.Queue = asyncio.Queue()
+        self._record_stopped_event: asyncio.Event = asyncio.Event()
+        self._last_recording_path: Optional[str] = None
+
     async def __aenter__(self):
         """Connect to OBS WebSocket on context entry."""
         await self.connect()
@@ -112,11 +117,13 @@ class OBSWebSocketClient:
                     self._hello_data["d"]["authentication"]
                 )
 
+            # EventSubscription::Outputs = 64 (1 << 6) - recording, streaming events
+            # See: https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md#eventsubscription
             identify_msg = {
                 "op": 1,
                 "d": {
                     "rpcVersion": self.rpc_version,
-                    "eventSubscriptions": 0,  # We don't need events
+                    "eventSubscriptions": 64,  # Subscribe to Output events (recording, streaming)
                 },
             }
 
@@ -131,6 +138,7 @@ class OBSWebSocketClient:
             )
 
             logger.debug("Successfully authenticated with OBS WebSocket")
+            logger.debug(f"Subscribed to event categories: {identify_msg['d']['eventSubscriptions']}")
 
         except asyncio.TimeoutError:
             raise OBSWebSocketError(f"Connection timeout to {self.url}")
@@ -216,9 +224,33 @@ class OBSWebSocketClient:
                         if not future.done():
                             future.set_result(data)
 
-                # OpCode 5 = Event (we ignore these for now)
+                # OpCode 5 = Event
                 elif op == 5:
-                    pass
+                    event_type = data["d"].get("eventType")
+                    event_data = data["d"].get("eventData", {})
+
+                    # Log ALL events for debugging
+                    logger.debug(f"Received event: {event_type}, data: {event_data}")
+
+                    # Handle RecordStateChanged event
+                    if event_type == "RecordStateChanged":
+                        output_active = event_data.get("outputActive", False)
+                        output_state = event_data.get("outputState", "unknown")
+
+                        logger.info(f"Recording state changed: active={output_active}, state={output_state}")
+
+                        # When recording stops, capture the output path
+                        if not output_active:
+                            output_path = event_data.get("outputPath")
+                            if output_path:
+                                self._last_recording_path = output_path
+                                self._record_stopped_event.set()
+                                logger.info(f"Recording stopped. Output path: {output_path}")
+                            else:
+                                logger.warning(f"Recording stopped but outputPath is missing/null. Full event: {event_data}")
+
+                    # Store event in queue for potential future use
+                    await self._recording_events.put(data)
 
                 else:
                     logger.debug(f"Received unhandled message: {data}")
@@ -324,6 +356,52 @@ class OBSWebSocketClient:
             },
         )
 
+    async def get_media_source_settings(self, input_name: str) -> Dict[str, Any]:
+        """
+        Get the current settings of a media source.
+
+        Args:
+            input_name: Name of the media source input
+
+        Returns:
+            Dict containing inputSettings and defaultInputSettings
+
+        Raises:
+            OBSWebSocketError: If getting settings fails
+        """
+        logger.debug(f"Getting settings for media source '{input_name}'")
+        response = await self.send_request("GetInputSettings", {"inputName": input_name})
+        return response
+
+    async def update_media_source(
+        self, input_name: str, file_path: str, overlay: bool = True
+    ) -> None:
+        """
+        Update the file path of a media source.
+
+        Args:
+            input_name: Name of the media source input
+            file_path: Absolute path to the new video file (host OS path)
+            overlay: If True, only updates file path (recommended).
+                     If False, replaces all settings (use with caution)
+
+        Raises:
+            OBSWebSocketError: If media source update fails
+        """
+        logger.info(f"Updating media source '{input_name}' to: {file_path}")
+        await self.send_request(
+            "SetInputSettings",
+            {
+                "inputName": input_name,
+                "inputSettings": {
+                    "local_file": file_path,
+                    "is_local_file": True,  # Required when setting local_file
+                },
+                "overlay": overlay,
+            },
+        )
+        logger.info(f"Successfully updated media source '{input_name}'")
+
     async def get_stream_status(self) -> bool:
         """
         Get the current streaming status.
@@ -361,3 +439,104 @@ class OBSWebSocketClient:
         logger.info("Stopping OBS stream")
         await self.send_request("StopStream")
         logger.info("Successfully stopped OBS stream")
+
+    async def get_record_status(self) -> Dict[str, Any]:
+        """
+        Get the current recording status.
+
+        Returns:
+            Dict with 'outputActive' (bool) and 'outputState' (str)
+
+        Raises:
+            OBSWebSocketError: If status check fails
+        """
+        logger.debug("Checking OBS recording status")
+        response = await self.send_request("GetRecordStatus")
+        is_recording = response.get("outputActive", False)
+        logger.debug(f"Recording status: {'active' if is_recording else 'inactive'}")
+        return response
+
+    async def set_record_directory(self, directory: str) -> None:
+        """
+        Set the directory where recordings will be saved.
+
+        Args:
+            directory: Absolute path to the recording output directory
+
+        Raises:
+            OBSWebSocketError: If directory setting fails
+        """
+        logger.info(f"Setting OBS recording directory to: {directory}")
+        await self.send_request("SetRecordDirectory", {"recordDirectory": directory})
+        logger.info(f"Successfully set recording directory")
+
+    async def start_record(self) -> None:
+        """
+        Start recording in OBS.
+
+        Performs a safety check to ensure OBS is not already recording.
+        If already recording, logs a warning and stops the existing recording first.
+
+        Raises:
+            OBSWebSocketError: If recording start fails
+        """
+        # Safety check: ensure not already recording
+        status = await self.get_record_status()
+        if status.get("outputActive"):
+            logger.warning("OBS is already recording. Stopping existing recording first.")
+            await self.stop_record()
+
+        # Clear the stopped event flag before starting
+        self._record_stopped_event.clear()
+        self._last_recording_path = None
+
+        logger.info("Starting OBS recording")
+        await self.send_request("StartRecord")
+        logger.info("Successfully started OBS recording")
+
+    async def stop_record(self, timeout: Optional[float] = None) -> Optional[str]:
+        """
+        Stop recording in OBS and wait for the output file path.
+
+        This method waits for the RecordStateChanged event to capture
+        the final recording file path.
+
+        Args:
+            timeout: Maximum time to wait for the recording path (defaults to 30 seconds)
+
+        Returns:
+            Absolute path to the recorded video file, or None if path not received
+
+        Raises:
+            OBSWebSocketError: If recording stop fails
+        """
+        logger.info("Stopping OBS recording")
+        await self.send_request("StopRecord")
+
+        # Wait for RecordStateChanged event with the output path
+        # Use longer timeout (30s) as recording finalization can take time
+        wait_timeout = timeout if timeout is not None else 30.0
+
+        logger.debug(f"Waiting up to {wait_timeout}s for RecordStateChanged event...")
+
+        try:
+            await asyncio.wait_for(
+                self._record_stopped_event.wait(), timeout=wait_timeout
+            )
+
+            if self._last_recording_path:
+                logger.info(
+                    f"Successfully stopped recording. File saved to: {self._last_recording_path}"
+                )
+                return self._last_recording_path
+            else:
+                logger.warning("Recording stopped but no output path received")
+                return None
+
+        except asyncio.TimeoutError:
+            logger.error(
+                f"Timeout waiting for RecordStateChanged event after {wait_timeout}s. "
+                f"Recording request was sent, but the event with output path was not received. "
+                f"Check OBS WebSocket event subscription (should be 64 for Outputs category)."
+            )
+            return None
