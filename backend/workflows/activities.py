@@ -4,11 +4,12 @@ import asyncio
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Dict, Optional, Tuple
 
 import boto3
@@ -84,6 +85,24 @@ RECORDINGS_DIR = DOWNLOADS_DIR / "recordings"  # /app/downloads/recordings
 
 # Ensure recordings directory exists
 RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_host_path_class(path_str: str):
+    """
+    Detect whether a path string is Windows or Unix-based and return the appropriate
+    pathlib class for constructing host OS paths from within a Linux container.
+
+    Args:
+        path_str: The path string to analyze (e.g., PROJECT_HOST_DIR)
+
+    Returns:
+        PureWindowsPath for Windows paths (C:\ or C:/)
+        PurePosixPath for macOS/Linux paths (/Users/... or /home/...)
+    """
+    # Check if path starts with Windows drive letter (e.g., C:\ or C:/)
+    if re.match(r'^[A-Za-z]:[/\\]', path_str):
+        return PureWindowsPath
+    return PurePosixPath
 
 
 class BrowserSessionResult(BaseModel):
@@ -952,7 +971,9 @@ async def start_obs_recording() -> None:
                 "PROJECT_HOST_DIR",
                 str(RECORDINGS_DIR.parent.parent)  # Fallback to container path for dev
             )
-            host_recording_dir = str(Path(project_host_dir) / "downloads" / "recordings")
+            # Use appropriate path class for host OS (Windows vs Unix)
+            PathClass = get_host_path_class(project_host_dir)
+            host_recording_dir = str(PathClass(project_host_dir) / "downloads" / "recordings")
 
             activity.logger.info(f"Setting OBS recording directory to: {host_recording_dir}")
             await obs.set_record_directory(host_recording_dir)
@@ -1065,7 +1086,9 @@ async def rotate_screensaver_video(last_video_index: int = -1) -> int:
             "PROJECT_HOST_DIR",
             str(BACKEND_ROOT.parent)  # Fallback to container path for dev
         )
-        video_host_path = str(Path(project_host_dir) / "obs" / selected_video)
+        # Use appropriate path class for host OS (Windows vs Unix)
+        PathClass = get_host_path_class(project_host_dir)
+        video_host_path = str(PathClass(project_host_dir) / "obs" / selected_video)
 
         activity.logger.info(f"Video host path: {video_host_path}")
 
