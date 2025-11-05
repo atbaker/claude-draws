@@ -1,9 +1,10 @@
 FROM python:3.13-slim
 
-# Install Node.js and npm, plus Playwright system dependencies
+# Install Node.js and npm, plus Playwright system dependencies and ffmpeg
 RUN apt-get update && apt-get install -y \
     curl \
     git \
+    ffmpeg \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \

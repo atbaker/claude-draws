@@ -1117,11 +1117,12 @@ async def rotate_screensaver_video(last_video_index: int = -1) -> int:
 @activity.defn
 async def compress_video(video_path: str) -> str:
     """
-    Compress video file using PyAV (H.264 + AAC).
+    Compress video file using ffmpeg (H.264 + AAC).
 
     Converts OBS recordings (.mov, .mkv) to compressed H.264 MP4:
     - Video: H.264 codec, CRF 23, medium preset, preserves original resolution
     - Audio: AAC codec, 128 kbps, stereo
+    - Multithreaded encoding for faster processing
     - Target: ~70-75% file size reduction
 
     Args:
@@ -1134,7 +1135,7 @@ async def compress_video(video_path: str) -> str:
         FileNotFoundError: If input file doesn't exist
         Exception: If compression fails (workflow will fail)
     """
-    import av
+    import asyncio
 
     activity.logger.info(f"Compressing video: {video_path}")
 
@@ -1154,96 +1155,40 @@ async def compress_video(video_path: str) -> str:
     activity.logger.info(f"Input file size: {input_size_mb:.2f} MB")
 
     try:
-        # Open input container
-        with av.open(str(video_path)) as input_container:
-            # Get input streams
-            input_video = input_container.streams.video[0]
-            input_audio = input_container.streams.audio[0] if input_container.streams.audio else None
+        # Build ffmpeg command with multithreading enabled
+        cmd = [
+            'ffmpeg',
+            '-i', str(video_path),
+            '-c:v', 'libx264',           # H.264 video codec
+            '-crf', '23',                # Constant Rate Factor (23 = high quality)
+            '-preset', 'medium',         # Balanced encoding speed
+            '-tune', 'animation',        # Optimized for screen content
+            '-threads', '0',             # Auto-detect CPU cores for multithreading
+            '-c:a', 'aac',               # AAC audio codec
+            '-b:a', '128k',              # 128 kbps audio bitrate
+            '-y',                        # Overwrite output file if exists
+            str(temp_output_path)
+        ]
 
-            activity.logger.info(f"Input video: {input_video.codec_context.name}, "
-                               f"{input_video.width}x{input_video.height}, "
-                               f"{input_video.average_rate} fps")
-            if input_audio:
-                activity.logger.info(f"Input audio: {input_audio.codec_context.name}, "
-                                   f"{input_audio.rate} Hz, {input_audio.channels} channels")
+        activity.logger.info("Starting ffmpeg compression (multithreaded)...")
+        activity.logger.info(f"Command: {' '.join(cmd)}")
 
-            # Open output container (use temporary path to avoid overwriting input)
-            with av.open(str(temp_output_path), 'w') as output_container:
-                # Configure output video stream (H.264)
-                output_video = output_container.add_stream('libx264', rate=input_video.average_rate)
-                output_video.width = input_video.width
-                output_video.height = input_video.height
-                output_video.pix_fmt = 'yuv420p'
+        # Run ffmpeg asynchronously
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
 
-                # H.264 encoding options for screen recording compression
-                # Optimized for text legibility in Kid Pix browser UI
-                output_video.codec_context.options = {
-                    'crf': '20',           # High quality for text clarity (lower=better, default=23)
-                    'preset': 'medium',    # Balanced encoding speed
-                    'tune': 'animation',   # Optimized for screen content with flat color areas
-                }
+        # Wait for compression to complete
+        stdout, stderr = await process.communicate()
 
-                activity.logger.info(f"Output video configured: H.264, {output_video.width}x{output_video.height}, CRF 20, medium preset, tune=animation")
+        # Check for errors
+        if process.returncode != 0:
+            stderr_output = stderr.decode() if stderr else "No error output"
+            raise Exception(f"ffmpeg failed with return code {process.returncode}:\n{stderr_output}")
 
-                # Configure output audio stream (AAC)
-                output_audio = None
-                if input_audio:
-                    output_audio = output_container.add_stream('aac', rate=44100, layout='stereo')
-                    output_audio.codec_context.bit_rate = 128000  # 128 kbps
-                    activity.logger.info("Output audio configured: AAC, 44.1 kHz, stereo, 128 kbps")
-
-                # Transcode video frames
-                activity.logger.info("Transcoding video...")
-                frame_count = 0
-                for packet in input_container.demux(input_video):
-                    for frame in packet.decode():
-                        # Reformat frame to output pixel format
-                        frame = frame.reformat(format=output_video.pix_fmt)
-
-                        # Encode and mux
-                        for encoded_packet in output_video.encode(frame):
-                            output_container.mux(encoded_packet)
-
-                        frame_count += 1
-                        if frame_count % 100 == 0:
-                            activity.logger.debug(f"Processed {frame_count} video frames...")
-
-                activity.logger.info(f"✓ Transcoded {frame_count} video frames")
-
-                # Transcode audio frames
-                if input_audio and output_audio:
-                    activity.logger.info("Transcoding audio...")
-
-                    # Create audio resampler to convert to output format
-                    resampler = av.AudioResampler(
-                        format=output_audio.format.name,
-                        layout='stereo',
-                        rate=44100
-                    )
-
-                    audio_frame_count = 0
-                    for packet in input_container.demux(input_audio):
-                        for frame in packet.decode():
-                            # Resample to match output stream configuration
-                            resampled_frames = resampler.resample(frame)
-
-                            for resampled_frame in resampled_frames:
-                                resampled_frame.pts = None  # Let encoder assign timestamps
-
-                                for encoded_packet in output_audio.encode(resampled_frame):
-                                    output_container.mux(encoded_packet)
-
-                                audio_frame_count += 1
-
-                    activity.logger.info(f"✓ Transcoded {audio_frame_count} audio frames")
-
-                    # Flush audio encoder
-                    for encoded_packet in output_audio.encode():
-                        output_container.mux(encoded_packet)
-
-                # Flush video encoder
-                for encoded_packet in output_video.encode():
-                    output_container.mux(encoded_packet)
+        activity.logger.info("✓ ffmpeg compression complete!")
 
         # Verify temporary compressed file was created
         if not temp_output_path.exists():
@@ -1253,7 +1198,6 @@ async def compress_video(video_path: str) -> str:
         output_size_mb = temp_output_path.stat().st_size / (1024 * 1024)
         reduction_pct = ((input_size_mb - output_size_mb) / input_size_mb) * 100
 
-        activity.logger.info(f"✓ Compression complete!")
         activity.logger.info(f"  Output size: {output_size_mb:.2f} MB")
         activity.logger.info(f"  Reduction: {reduction_pct:.1f}%")
 
