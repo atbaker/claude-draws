@@ -22,3 +22,16 @@ bucket_name = "claudedraws-prod"
 [[routes]]
 pattern = "claudedraws.xyz"
 custom_domain = true
+
+[[routes]]
+pattern = "www.claudedraws.xyz"
+custom_domain = true
+
+[[routes]]
+pattern = "claudedraws.com"
+custom_domain = true
+
+
+[[routes]]
+pattern = "www.claudedraws.com"
+custom_domain = true
