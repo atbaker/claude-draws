@@ -170,7 +170,7 @@
 							Claude Draws processes the most-upvoted submissions first. After you submit, you can upvote other submissions in the <a href="/queue">queue</a> - and others can upvote yours too! You can watch Claude Draws work on the livestream at the top of this page. And if you'd like to be notified when your artwork is ready, just include your email address in the form - it's completely optional.
 						</p>
 						<p>
-							So don't worry if the queue is backed up - you don't have to watch the livestream to catch your finished artwork. If you provided an email, you'll get a notification when it's done. Otherwise, you can check back in the gallery to see your completed creation!
+							So don't worry if the queue is backed up - you don't have to watch the livestream to catch your finished artwork. If you provided an email, you'll get a notification when it's done. Otherwise, you can check back in the gallery to see your completed creation! Plus, each artwork page includes a recording of the entire drawing process, so you can watch Claude work through your design anytime.
 						</p>
 					</div>
 				</details>
@@ -278,7 +278,27 @@
 					</div>
 				</details>
 
-				<!-- FAQ 6: Is this an art project -->
+				<!-- FAQ 6: After Dark screensavers -->
+				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
+					<summary
+						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
+					>
+						<span class="transform transition-transform group-open:rotate-90 text-2xl"
+							>▶</span
+						>
+						What are those screensavers I see between artworks?
+					</summary>
+					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
+						<p>
+							Those screensavers come from <a href="https://en.wikipedia.org/wiki/After_Dark_(software)">After Dark</a>, classic screen saver software that launched in 1989. If you spent time around computers in the 1990s, you probably remember Flying Toasters, the fish tank, or one of the many other iconic modules that came with After Dark.
+						</p>
+						<p>
+							I pulled a selection of my favorite After Dark screensavers to use with Claude Draws. You can see more in <a href="https://www.youtube.com/watch?v=9nOSe2Sfhfk&list=PLoOqWbDi1JN1MDsYEJdZgQXGFwHkjOiSG">this playlist on YouTube</a>.
+						</p>
+					</div>
+				</details>
+
+				<!-- FAQ 7: Is this an art project -->
 				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
 					<summary
 						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
@@ -308,7 +328,7 @@
 					</div>
 				</details>
 
-				<!-- FAQ 7: Other browser agents -->
+				<!-- FAQ 8: Other browser agents -->
 				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
 					<summary
 						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
@@ -350,7 +370,7 @@
 					</div>
 				</details>
 
-				<!-- FAQ 8: Open source -->
+				<!-- FAQ 9: Open source -->
 				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
 					<summary
 						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
@@ -373,7 +393,7 @@
 					</div>
 				</details>
 
-				<!-- FAQ 9: Tools used -->
+				<!-- FAQ 10: Tools used -->
 				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
 					<summary
 						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
