@@ -5,11 +5,10 @@
 <div class="video-player border-4 border-black bg-black">
 	<video
 		class="w-full h-auto"
-		src={videoUrl}
-		type="video/mp4"
 		controls
 		preload="metadata"
 	>
+		<source src={videoUrl} type="video/mp4" />
 		<track kind="captions" />
 		Your browser does not support the video tag.
 	</video>
