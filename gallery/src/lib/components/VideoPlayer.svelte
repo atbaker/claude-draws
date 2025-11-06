@@ -8,6 +8,7 @@
 		src={videoUrl}
 		controls
 		preload="metadata"
+		playsinline
 	>
 		<track kind="captions" />
 		Your browser does not support the video tag.
