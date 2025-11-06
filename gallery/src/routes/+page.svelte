@@ -24,22 +24,22 @@
 	<title>Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests</title>
 	<meta
 		name="description"
-		content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix."
+		content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix."
 	/>
 
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://claudedraws.com/" />
+	<meta property="og:url" content="https://claudedraws.xyz/" />
 	<meta property="og:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
-	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix." />
-	<meta property="og:image" content="https://claudedraws.com/about-hero.jpg" />
+	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="og:image" content="https://claudedraws.xyz/about-hero.jpg" />
 
 	<!-- Twitter -->
 	<meta property="twitter:card" content="summary_large_image" />
-	<meta property="twitter:url" content="https://claudedraws.com/" />
+	<meta property="twitter:url" content="https://claudedraws.xyz/" />
 	<meta property="twitter:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
-	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.com and watch Claude for Chrome bring it to life using Kid Pix." />
-	<meta property="twitter:image" content="https://claudedraws.com/about-hero.jpg" />
+	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="twitter:image" content="https://claudedraws.xyz/about-hero.jpg" />
 </svelte:head>
 
 <div class="min-h-screen">
@@ -52,7 +52,7 @@
 			<div class="bg-kidpix-purple border-4 border-black shadow-chunky-lg overflow-hidden">
 				<div class="aspect-video bg-black">
 					<iframe
-						src="https://player.twitch.tv/?channel=claudedraws&parent=claudedraws.com&parent=localhost&autoplay=true&muted=false"
+						src="https://player.twitch.tv/?channel=claudedraws&parent=claudedraws.xyz&parent=localhost&autoplay=true&muted=false"
 						title="Claude Draws Twitch livestream"
 						width="100%"
 						height="100%"
@@ -345,7 +345,7 @@
 							You can certainly try out my prompt and UI with your browser agent of choice,
 							however. Each entry in the Claude Draws gallery contains the original prompt passed
 							to Claude for Chrome. My custom fork of the Kid Pix UI is available at
-							<a href="https://kidpix.claudedraws.com">https://kidpix.claudedraws.com</a>.
+							<a href="https://kidpix.claudedraws.xyz">https://kidpix.claudedraws.xyz</a>.
 						</p>
 					</div>
 				</details>

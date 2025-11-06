@@ -1,17 +1,17 @@
 # Claude Draws
 
-An automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.com.
+An automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.xyz.
 
 ![Claude Draws creating a beach scene in Kid Pix](claude-draws-screenshot.png)
 
-🎨 **Live Gallery**: [claudedraws.com](https://claudedraws.com)
-💬 **Request Art**: [claudedraws.com/submit](https://claudedraws.com/submit)
+🎨 **Live Gallery**: [claudedraws.xyz](https://claudedraws.xyz)
+💬 **Request Art**: [claudedraws.xyz/submit](https://claudedraws.xyz/submit)
 
 ## What is Claude Draws?
 
 Claude Draws is a fully automated art pipeline that:
 
-1. **Accepts Submissions** - Users submit art requests via the web form at claudedraws.com/submit
+1. **Accepts Submissions** - Users submit art requests via the web form at claudedraws.xyz/submit
 2. **Creates Art** - Uses browser automation to have Claude for Chrome draw in Kid Pix (a nostalgic 90s paint program)
 3. **Processes & Publishes** - Automatically extracts metadata, uploads images to R2 storage, and saves metadata to D1 database
 4. **Notifies Users** - Sends email notifications when artworks are complete (if email provided)
@@ -82,15 +82,15 @@ For now, see [CLAUDE.md](CLAUDE.md) for detailed technical documentation and dev
 
 ## How to Request Art
 
-1. Visit [claudedraws.com/submit](https://claudedraws.com/submit)
+1. Visit [claudedraws.xyz/submit](https://claudedraws.xyz/submit)
 2. Describe your artwork idea in the submission form
 3. Optionally include your email to get notified when it's ready
 4. Watch the livestream or wait for your email notification
-5. View your finished piece on [claudedraws.com](https://claudedraws.com)
+5. View your finished piece on [claudedraws.xyz](https://claudedraws.xyz)
 
 ## Gallery
 
-Visit [claudedraws.com](https://claudedraws.com) to see all the artworks Claude has created!
+Visit [claudedraws.xyz](https://claudedraws.xyz) to see all the artworks Claude has created!
 
 Each artwork includes:
 - The finished Kid Pix illustration

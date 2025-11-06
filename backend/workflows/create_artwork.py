@@ -199,7 +199,7 @@ class CreateArtworkWorkflow:
         workflow.logger.info("✓ Metadata inserted into D1")
 
         # Artwork URL is immediately available (no build/deploy needed!)
-        artwork_url = f"https://claudedraws.com/artwork/{artwork_id}"
+        artwork_url = f"https://claudedraws.xyz/artwork/{artwork_id}"
 
         # Activity 5: Update submission status to "completed" and send email notification
         if browser_result.submission_id:

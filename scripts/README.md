@@ -17,7 +17,7 @@ Both monitors now query a centralized endpoint instead of D1 directly, simplifyi
 ### Prerequisites
 
 - Windows PC with PowerShell 5.1 or later
-- Access to the Claude Draws gallery endpoint (default: https://claudedraws.com)
+- Access to the Claude Draws gallery endpoint (default: https://claudedraws.xyz)
 
 ### Installation
 
@@ -46,7 +46,7 @@ Both monitors now query a centralized endpoint instead of D1 directly, simplifyi
 
 The sleep monitor supports these parameters (can be passed when running the script):
 
-- `GalleryUrl` (default: "https://claudedraws.com") - URL of the Claude Draws gallery site
+- `GalleryUrl` (default: "https://claudedraws.xyz") - URL of the Claude Draws gallery site
 - `PollIntervalSeconds` (default: 60) - How often to check for activity
 
 The inactivity threshold (15 minutes) is hardcoded in the API endpoint.
@@ -69,7 +69,7 @@ The endpoint determines `shouldSleep` based on:
 
 **Sleep not triggering:**
 - Check logs: `Get-Content backend\scripts\sleep_monitor.log -Tail 50`
-- Verify the gallery endpoint is accessible: `Invoke-RestMethod -Uri "https://claudedraws.com/api/system-status"`
+- Verify the gallery endpoint is accessible: `Invoke-RestMethod -Uri "https://claudedraws.xyz/api/system-status"`
 - Check Windows power settings allow sleep
 
 **Task not running:**
@@ -95,7 +95,7 @@ Remove-Item backend\scripts\sleep_monitor.log
 - Linux server on the same network as Windows PC (e.g., Home Assistant, Raspberry Pi)
 - `jq` package (for JSON parsing, usually pre-installed)
 - `curl` (usually pre-installed)
-- Access to the Claude Draws gallery endpoint (default: https://claudedraws.com)
+- Access to the Claude Draws gallery endpoint (default: https://claudedraws.xyz)
 - PC's MAC address and Wake-on-LAN enabled in BIOS
 - **For Home Assistant**: The `wake_on_lan` integration (install via Configuration → Integrations)
 
@@ -142,7 +142,7 @@ Remove-Item backend\scripts\sleep_monitor.log
    shell_command:
      check_claude_draws: >
        /config/scripts/wol_monitor.sh
-       --gallery-url https://claudedraws.com
+       --gallery-url https://claudedraws.xyz
        --log-file /config/logs/wol_monitor.log
    ```
 
@@ -221,7 +221,7 @@ This two-part design avoids network interface issues in containerized environmen
 
 Environment variables / command-line arguments:
 
-- `GALLERY_URL` / `--gallery-url` (default: https://claudedraws.com) - URL of the Claude Draws gallery site
+- `GALLERY_URL` / `--gallery-url` (default: https://claudedraws.xyz) - URL of the Claude Draws gallery site
 - `WOL_LOG_FILE` / `--log-file` (default: /tmp/claude-draws-wol-monitor.log) - Log file path
 
 ### Troubleshooting
@@ -239,7 +239,7 @@ Environment variables / command-line arguments:
 - Check the script logs: `tail -50 /config/logs/wol_monitor.log`
 - Test the endpoint manually from Home Assistant Terminal add-on:
   ```bash
-  curl -s https://claudedraws.com/api/system-status | jq
+  curl -s https://claudedraws.xyz/api/system-status | jq
   ```
 - Verify the endpoint is accessible and returns valid JSON
 - Check automation is running: Configuration → Automations & Scenes
@@ -302,7 +302,7 @@ sudo rm /var/log/claude-draws-wol-monitor.log
    - Check sleep monitor logs to confirm
 
 4. **Test wake trigger**:
-   - With PC asleep, submit a new request at claudedraws.com/submit
+   - With PC asleep, submit a new request at claudedraws.xyz/submit
    - WoL monitor should detect it within 30 seconds
    - WoL packet should be sent
    - PC should wake up

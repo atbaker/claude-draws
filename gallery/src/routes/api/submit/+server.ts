@@ -78,7 +78,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						'Content-Type': 'application/json'
 					},
 					body: JSON.stringify({
-						from: 'Claude Draws <noreply@notifications.claudedraws.com>',
+						from: 'Claude Draws <noreply@notifications.claudedraws.xyz>',
 						to: [adminEmail],
 						subject: 'New Claude Draws Submission',
 						html: `

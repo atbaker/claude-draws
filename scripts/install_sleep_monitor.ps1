@@ -14,7 +14,7 @@ if (-not $isAdmin) {
 # Configuration
 $TaskName = "ClaudeDraws-SleepMonitor"
 $ScriptPath = Join-Path $PSScriptRoot "sleep_monitor.ps1"
-$GalleryUrl = "https://claudedraws.com"
+$GalleryUrl = "https://claudedraws.xyz"
 $PollIntervalSeconds = 60
 
 Write-Host "=========================================="

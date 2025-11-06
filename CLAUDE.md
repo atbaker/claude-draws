@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.com. The complete workflow:
+**Claude Draws** is an automated art project where Claude for Chrome creates crowdsourced illustrations using Kid Pix, sourced from user submissions at claudedraws.xyz. The complete workflow:
 
-1. **Web form** (claudedraws.com/submit) accepts art requests and stores them in Cloudflare D1
+1. **Web form** (claudedraws.xyz/submit) accepts art requests and stores them in Cloudflare D1
 2. **Browser automation** (Playwright + CDP) submits prompts to Claude for Chrome extension
 3. **OBS recording** captures the entire artwork creation process via WebSocket control
 4. **Claude draws** in a modified Kid Pix JavaScript app (served from local directory, not included in this repo)
@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 6. **BAML extraction** parses Claude's title and artist statement from the final response
 7. **Cloudflare R2** stores artwork images and creation videos
 8. **Cloudflare D1** stores artwork metadata (including video URLs) in SQLite database
-9. **SvelteKit gallery** (`gallery/`) displays all artworks with videos at claudedraws.com with SSR-on-demand
+9. **SvelteKit gallery** (`gallery/`) displays all artworks with videos at claudedraws.xyz with SSR-on-demand
 10. **Cloudflare Workers** hosts the gallery site
 
 ### Repository Structure (Monorepo)
@@ -365,7 +365,7 @@ uv run baml-cli generate
   - `R2_ACCESS_KEY_ID` - R2 API access key
   - `R2_SECRET_ACCESS_KEY` - R2 API secret key
   - `R2_BUCKET_NAME` - R2 bucket name (e.g., `claudedraws-dev`)
-  - `R2_PUBLIC_URL` - Public R2 URL (e.g., `https://r2.claudedraws.com`)
+  - `R2_PUBLIC_URL` - Public R2 URL (e.g., `https://r2.claudedraws.xyz`)
   - `D1_API_TOKEN` - Cloudflare API token for D1 database access
   - `D1_ACCOUNT_ID` - Cloudflare account ID for D1
   - `D1_DATABASE_ID` - D1 database ID

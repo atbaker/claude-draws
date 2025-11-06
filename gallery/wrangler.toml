@@ -20,5 +20,5 @@ bucket_name = "claudedraws-prod"
 
 # Custom domain configuration
 [[routes]]
-pattern = "claudedraws.com"
+pattern = "claudedraws.xyz"
 custom_domain = true

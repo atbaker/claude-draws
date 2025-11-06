@@ -2,7 +2,7 @@
 # Monitors artwork activity and triggers Windows sleep after inactivity threshold
 
 param(
-    [string]$GalleryUrl = "https://claudedraws.com",
+    [string]$GalleryUrl = "https://claudedraws.xyz",
     [int]$PollIntervalSeconds = 60
 )
 

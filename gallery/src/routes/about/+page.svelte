@@ -12,17 +12,17 @@
 
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://claudedraws.com/about" />
+	<meta property="og:url" content="https://claudedraws.xyz/about" />
 	<meta property="og:title" content="About - Claude Draws" />
 	<meta property="og:description" content="Is AI ready for the Information Superhighway? Learn about Claude Draws, an interactive educational demo exploring AI browser agents through Kid Pix art." />
-	<meta property="og:image" content="https://claudedraws.com/about-hero.jpg" />
+	<meta property="og:image" content="https://claudedraws.xyz/about-hero.jpg" />
 
 	<!-- Twitter -->
 	<meta property="twitter:card" content="summary_large_image" />
-	<meta property="twitter:url" content="https://claudedraws.com/about" />
+	<meta property="twitter:url" content="https://claudedraws.xyz/about" />
 	<meta property="twitter:title" content="About - Claude Draws" />
 	<meta property="twitter:description" content="Is AI ready for the Information Superhighway? Learn about Claude Draws, an interactive educational demo exploring AI browser agents through Kid Pix art." />
-	<meta property="twitter:image" content="https://claudedraws.com/about-hero.jpg" />
+	<meta property="twitter:image" content="https://claudedraws.xyz/about-hero.jpg" />
 </svelte:head>
 
 <div class="min-h-screen">

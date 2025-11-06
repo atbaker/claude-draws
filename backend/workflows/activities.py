@@ -58,7 +58,7 @@ D1_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN")
 
 # Resend Email Configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "Claude Draws <noreply@claudedraws.com>")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "Claude Draws <noreply@claudedraws.xyz>")
 
 # OBS WebSocket Configuration
 OBS_WEBSOCKET_URL = os.getenv("OBS_WEBSOCKET_URL", "ws://localhost:4444")
@@ -111,7 +111,7 @@ class BrowserSessionResult(BaseModel):
     response_html: str
     submission_id: Optional[str]  # D1 submission ID if from form
     submission_email: Optional[str]  # Email for notification if provided
-    tab_url: str  # URL of the tab to reconnect to later (e.g., https://kidpix.claudedraws.com)
+    tab_url: str  # URL of the tab to reconnect to later (e.g., https://kidpix.claudedraws.xyz)
     prompt: str  # The full prompt text submitted to Claude
 
 
@@ -170,7 +170,7 @@ async def visit_gallery(page) -> None:
         page: Playwright page object
     """
     activity.logger.info("Navigating to Claude Draws gallery...")
-    await page.goto('https://claudedraws.com')
+    await page.goto('https://claudedraws.xyz')
     await page.wait_for_load_state('domcontentloaded')
 
     # Show gallery for 5 seconds
@@ -222,7 +222,7 @@ async def get_next_submission(page) -> Optional[Dict]:
 
         # Navigate to gallery for livestream viewers
         activity.logger.info("Navigating to gallery for livestream viewers...")
-        await page.goto('https://claudedraws.com')
+        await page.goto('https://claudedraws.xyz')
         await page.wait_for_load_state('domcontentloaded')
         await page.wait_for_timeout(3000)
 
@@ -404,7 +404,7 @@ async def browser_session_activity(cdp_url: str, submission_id: Optional[str] = 
 
             # Navigate to Kid Pix
             activity.logger.info("Navigating to Kid Pix...")
-            await page.goto('https://kidpix.claudedraws.com')
+            await page.goto('https://kidpix.claudedraws.xyz')
             await page.wait_for_load_state('domcontentloaded')
 
             # Wait for message input and submit prompt
@@ -487,7 +487,7 @@ async def browser_session_activity(cdp_url: str, submission_id: Optional[str] = 
             await page.wait_for_timeout(4000)
             await side_panel_page.close()
 
-            # Store the tab URL for reconnection (should be https://kidpix.claudedraws.com for Kid Pix)
+            # Store the tab URL for reconnection (should be https://kidpix.claudedraws.xyz for Kid Pix)
             tab_url = page.url
             activity.logger.info(f"Storing tab URL for reconnection: {tab_url}")
 
@@ -723,7 +723,7 @@ async def send_email_notification(
                         </a>
                     </p>
                     <p style="color: #666; font-size: 14px; margin-top: 40px;">
-                        This artwork was created by Claude for Chrome using Kid Pix at <a href="https://claudedraws.com">claudedraws.com</a>
+                        This artwork was created by Claude for Chrome using Kid Pix at <a href="https://claudedraws.xyz">claudedraws.xyz</a>
                     </p>
                 </body>
             </html>
@@ -750,7 +750,7 @@ async def cleanup_tab_activity(cdp_url: str, tab_url: str) -> None:
 
     Args:
         cdp_url: Chrome DevTools Protocol URL
-        tab_url: URL of the tab to close (e.g., https://kidpix.claudedraws.com)
+        tab_url: URL of the tab to close (e.g., https://kidpix.claudedraws.xyz)
     """
     activity.logger.info("Cleaning up tab...")
 
@@ -1146,8 +1146,9 @@ async def compress_video(video_path: str) -> str:
     Compress video file using ffmpeg (H.264 + AAC).
 
     Converts OBS recordings (.mov, .mkv) to compressed H.264 MP4:
-    - Video: H.264 codec, CRF 23, medium preset, preserves original resolution
+    - Video: H.264 codec, CRF 23, medium preset, Main profile, preserves original resolution
     - Audio: AAC codec, 128 kbps, stereo, 2x volume boost for better audibility
+    - iOS compatible: faststart flag, Main profile Level 4.1 for broad device support
     - Multithreaded encoding for faster processing
     - Target: ~70-75% file size reduction
 
@@ -1190,6 +1191,9 @@ async def compress_video(video_path: str) -> str:
             '-crf', '23',                # Constant Rate Factor (23 = high quality)
             '-preset', 'medium',         # Balanced encoding speed
             '-tune', 'animation',        # Optimized for screen content
+            '-profile:v', 'main',        # Main profile for iOS compatibility
+            '-level', '4.1',             # Level 4.1 supports up to 1080p
+            '-movflags', '+faststart',   # Move moov atom to start for iOS streaming
             '-threads', '0',             # Auto-detect CPU cores for multithreading
             '-c:a', 'aac',               # AAC audio codec
             '-b:a', '128k',              # 128 kbps audio bitrate
@@ -1380,7 +1384,7 @@ async def visit_gallery_activity(cdp_url: str) -> None:
 
         try:
             # Navigate to gallery
-            await page.goto('https://claudedraws.com')
+            await page.goto('https://claudedraws.xyz')
             await page.wait_for_load_state('domcontentloaded')
 
             # Show gallery for 5 seconds

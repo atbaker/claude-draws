@@ -9,7 +9,7 @@
 #   2 = Query error
 
 # Configuration (can be overridden with environment variables or command-line arguments)
-GALLERY_URL="${GALLERY_URL:-https://claudedraws.com}"
+GALLERY_URL="${GALLERY_URL:-https://claudedraws.xyz}"
 LOG_FILE="${WOL_LOG_FILE:-/tmp/claude-draws-wol-monitor.log}"
 
 # Parse command-line arguments
