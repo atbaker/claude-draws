@@ -617,6 +617,32 @@ async def insert_artwork_to_d1(artwork_id: str, metadata: Dict) -> None:
 
 
 @activity.defn
+async def update_artwork_video_url(artwork_id: str, video_url: str) -> None:
+    """
+    Update an existing artwork row with the video URL after video processing completes.
+
+    This is used when video processing happens in a separate workflow after the
+    artwork has already been inserted into D1.
+
+    Args:
+        artwork_id: Unique identifier for the artwork
+        video_url: Public URL of the uploaded video
+    """
+    activity.logger.info(f"Updating artwork {artwork_id} with video URL")
+
+    try:
+        sql = "UPDATE artworks SET video_url = ? WHERE id = ?"
+        params = [video_url, artwork_id]
+
+        await query_d1(sql, params)
+        activity.logger.info(f"✓ Updated artwork video URL: {artwork_id}")
+
+    except Exception as e:
+        activity.logger.error(f"✗ Error updating artwork video URL: {e}")
+        raise
+
+
+@activity.defn
 async def update_submission_status(
     submission_id: str,
     status: str,
@@ -1121,7 +1147,7 @@ async def compress_video(video_path: str) -> str:
 
     Converts OBS recordings (.mov, .mkv) to compressed H.264 MP4:
     - Video: H.264 codec, CRF 23, medium preset, preserves original resolution
-    - Audio: AAC codec, 128 kbps, stereo
+    - Audio: AAC codec, 128 kbps, stereo, 2x volume boost for better audibility
     - Multithreaded encoding for faster processing
     - Target: ~70-75% file size reduction
 
@@ -1159,6 +1185,7 @@ async def compress_video(video_path: str) -> str:
         cmd = [
             'ffmpeg',
             '-i', str(video_path),
+            '-af', 'volume=2.0',         # Double audio volume for better audibility
             '-c:v', 'libx264',           # H.264 video codec
             '-crf', '23',                # Constant Rate Factor (23 = high quality)
             '-preset', 'medium',         # Balanced encoding speed

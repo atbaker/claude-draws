@@ -4,13 +4,13 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.workflow import ParentClosePolicy
 
 # Import activities
 with workflow.unsafe.imports_passed_through():
     from workflows.activities import (
         browser_session_activity,
         cleanup_tab_activity,
-        compress_video,
         extract_artwork_metadata,
         insert_artwork_to_d1,
         send_email_notification,
@@ -18,9 +18,9 @@ with workflow.unsafe.imports_passed_through():
         stop_obs_recording,
         update_submission_status,
         upload_image_to_r2,
-        upload_video_to_r2,
         BrowserSessionResult,
     )
+    from workflows.process_video import ProcessVideoWorkflow
 
 
 @workflow.defn
@@ -28,21 +28,26 @@ class CreateArtworkWorkflow:
     """
     Workflow for creating artwork from form submissions.
 
-    This workflow handles the entire end-to-end process:
+    This workflow handles the main artwork creation process:
     1. Updates submission status to "processing" (if submission_id provided)
     2. Starts OBS recording of the artwork creation process
     3. Browser session: finds pending submission, submits to Claude, waits, downloads
     4. Stops OBS recording and retrieves video file path
-    5. Compresses video using PyAV (H.264, ~70-75% size reduction)
+    5. Starts background ProcessVideoWorkflow for video compression/upload (non-blocking)
     6. Extracts metadata (title and artist statement)
     7. Uploads image to R2
-    8. Uploads compressed video to R2 (if recording was successful)
-    9. Inserts metadata into D1 artworks table (including video URL)
-    10. Updates submission status to "completed"
-    11. Sends email notification (if email provided)
+    8. Inserts metadata into D1 artworks table (video URL initially NULL)
+    9. Updates submission status to "completed"
+    10. Sends email notification (if email provided)
+
+    Video processing happens in parallel in ProcessVideoWorkflow:
+    - Compresses video using ffmpeg (H.264, ~70-75% size reduction)
+    - Uploads compressed video to R2
+    - Updates D1 artwork row with video URL when complete
 
     Note: No build/deploy step required! Gallery pages fetch from D1 at runtime,
-    so new artworks appear immediately without rebuilding the site.
+    so new artworks appear immediately without rebuilding the site. Video tab
+    appears later when ProcessVideoWorkflow completes.
 
     Note: Continuous mode scheduling is handled by CheckSubmissionsWorkflow.
     This workflow no longer schedules the next workflow run.
@@ -120,28 +125,27 @@ class CreateArtworkWorkflow:
             workflow.logger.warning(f"⚠ Failed to stop OBS recording: {e}")
             workflow.logger.warning("Continuing without recording...")
 
-        # Compress video (if recording was successful)
-        compressed_video_path = None
-        if video_path:
-            try:
-                compressed_video_path = await workflow.execute_activity(
-                    compress_video,
-                    args=[video_path],
-                    start_to_close_timeout=timedelta(minutes=5),  # Allow time for compression
-                    retry_policy=RetryPolicy(
-                        maximum_attempts=2,
-                        backoff_coefficient=2.0,
-                    ),
-                )
-                workflow.logger.info(f"✓ Video compressed: {compressed_video_path}")
-            except Exception as e:
-                # Compression failure should not block artwork creation
-                workflow.logger.warning(f"⚠ Failed to compress video: {e}")
-                workflow.logger.warning("Continuing without video...")
-                compressed_video_path = None
-
         # Generate artwork ID based on timestamp
         artwork_id = f"claudedraws-{int(workflow.now().timestamp())}"
+
+        # Start background video processing workflow (non-blocking)
+        # This runs independently so we don't wait for video compression/upload
+        if video_path:
+            try:
+                workflow.logger.info("Starting background video processing workflow...")
+                await workflow.start_child_workflow(
+                    ProcessVideoWorkflow.run,
+                    args=[artwork_id, video_path],
+                    id=f"process-video-{artwork_id}",  # Unique workflow ID
+                    parent_close_policy=ParentClosePolicy.ABANDON,  # Continue after parent completes
+                )
+                workflow.logger.info(f"✓ ProcessVideoWorkflow started for artwork: {artwork_id}")
+            except Exception as e:
+                # Video workflow start failure should not block artwork creation
+                workflow.logger.warning(f"⚠ Failed to start video processing workflow: {e}")
+                workflow.logger.warning("Continuing without video...")
+        else:
+            workflow.logger.info("⊘ No video to process (recording was skipped or failed)")
 
         # Activity 2: Extract metadata from Claude's response using BAML
         title, artist_statement = await workflow.execute_activity(
@@ -171,35 +175,15 @@ class CreateArtworkWorkflow:
 
         workflow.logger.info(f"✓ Image uploaded: {image_url}")
 
-        # Activity 4: Upload video to R2 (if compression was successful)
-        video_url = None
-        if compressed_video_path:
-            try:
-                video_url = await workflow.execute_activity(
-                    upload_video_to_r2,
-                    args=[artwork_id, compressed_video_path],
-                    start_to_close_timeout=timedelta(minutes=5),  # Reduced timeout for compressed videos
-                    retry_policy=RetryPolicy(
-                        maximum_attempts=3,
-                        backoff_coefficient=2.0,
-                    ),
-                )
-                workflow.logger.info(f"✓ Video uploaded: {video_url}")
-            except Exception as e:
-                # Video upload failure should not block artwork creation
-                workflow.logger.warning(f"⚠ Failed to upload video to R2: {e}")
-                workflow.logger.warning("Continuing without video...")
-        else:
-            workflow.logger.info("⊘ No video to upload (recording/compression was skipped or failed)")
-
-        # Activity 5: Insert metadata into D1
+        # Activity 4: Insert metadata into D1
+        # Note: videoUrl is initially None - ProcessVideoWorkflow will update it later
         metadata = {
             "id": artwork_id,
             "title": title,
             "artistStatement": artist_statement,
             "imageUrl": image_url,  # Include image URL for D1
             "createdAt": workflow.now().isoformat(),
-            "videoUrl": video_url,  # Include video URL (or None if recording failed)
+            "videoUrl": None,  # Will be updated by ProcessVideoWorkflow when video processing completes
             "prompt": browser_result.prompt,
             "submissionId": browser_result.submission_id,
             "autogenerated": browser_result.submission_id is None,  # Auto-generated if no submission

@@ -26,6 +26,7 @@ from workflows.activities import (
     start_obs_recording,
     stop_obs_recording,
     switch_obs_scene,
+    update_artwork_video_url,
     update_countdown_text,
     update_submission_status,
     upload_image_to_r2,
@@ -34,6 +35,7 @@ from workflows.activities import (
 )
 from workflows.check_submissions import CheckSubmissionsWorkflow
 from workflows.create_artwork import CreateArtworkWorkflow
+from workflows.process_video import ProcessVideoWorkflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,7 +59,7 @@ async def main():
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[CheckSubmissionsWorkflow, CreateArtworkWorkflow],
+        workflows=[CheckSubmissionsWorkflow, CreateArtworkWorkflow, ProcessVideoWorkflow],
         activities=[
             browser_session_activity,
             check_for_pending_submissions,
@@ -72,6 +74,7 @@ async def main():
             start_obs_recording,
             stop_obs_recording,
             switch_obs_scene,
+            update_artwork_video_url,
             update_countdown_text,
             update_submission_status,
             upload_image_to_r2,
