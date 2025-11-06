@@ -9,8 +9,6 @@
 		type="video/mp4"
 		controls
 		preload="metadata"
-		playsinline
-		webkit-playsinline
 	>
 		<track kind="captions" />
 		Your browser does not support the video tag.
