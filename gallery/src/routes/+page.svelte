@@ -3,7 +3,8 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import ArtworkCard from '$lib/components/ArtworkCard.svelte';
-	import QueuePreview from '$lib/components/QueuePreview.svelte';
+	import TabContainer from '$lib/components/TabContainer.svelte';
+	import VideoPlayer from '$lib/components/VideoPlayer.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -18,27 +19,28 @@
 
 	// Artworks are already filtered and sorted by the API
 	const recentArtworks = data.artworks;
+	const featuredArtwork = data.featuredArtwork;
 </script>
 
 <svelte:head>
-	<title>Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests</title>
+	<title>Claude Draws - Kid Pix art created by Claude for Chrome</title>
 	<meta
 		name="description"
-		content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix."
+		content="An interactive educational demo exploring AI browser agents. Browse the gallery of Kid Pix artworks created by Claude for Chrome from crowdsourced requests."
 	/>
 
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://claudedraws.xyz/" />
-	<meta property="og:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
-	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="og:title" content="Claude Draws - Kid Pix art created by Claude for Chrome" />
+	<meta property="og:description" content="An interactive educational demo exploring AI browser agents. Browse the gallery of Kid Pix artworks created by Claude for Chrome from crowdsourced requests." />
 	<meta property="og:image" content="https://claudedraws.xyz/about-hero.jpg" />
 
 	<!-- Twitter -->
 	<meta property="twitter:card" content="summary_large_image" />
 	<meta property="twitter:url" content="https://claudedraws.xyz/" />
-	<meta property="twitter:title" content="Claude Draws - Watch Claude for Chrome create Kid Pix art from your requests" />
-	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Submit your art request on claudedraws.xyz and watch Claude for Chrome bring it to life using Kid Pix." />
+	<meta property="twitter:title" content="Claude Draws - Kid Pix art created by Claude for Chrome" />
+	<meta property="twitter:description" content="An interactive educational demo exploring AI browser agents. Browse the gallery of Kid Pix artworks created by Claude for Chrome from crowdsourced requests." />
 	<meta property="twitter:image" content="https://claudedraws.xyz/about-hero.jpg" />
 </svelte:head>
 
@@ -47,26 +49,57 @@
 
 	<!-- Main Content -->
 	<main class="container mx-auto p-4 sm:p-8">
-		<!-- Livestream Section -->
+		<!-- That's a wrap! Banner -->
 		<div class="max-w-4xl mx-auto mb-8">
-			<div class="bg-kidpix-purple border-4 border-black shadow-chunky-lg overflow-hidden">
-				<div class="aspect-video bg-black">
-					<iframe
-						src="https://player.twitch.tv/?channel=claudedraws&parent=claudedraws.xyz&parent=localhost&autoplay=true&muted=false"
-						title="Claude Draws Twitch livestream"
-						width="100%"
-						height="100%"
-						allowfullscreen
-					></iframe>
-				</div>
+			<div class="bg-kidpix-purple border-4 border-black p-6 shadow-chunky-lg">
+				<h2 class="text-2xl sm:text-3xl font-black uppercase text-center text-white">That's a wrap!</h2>
+				<p class="text-base sm:text-lg font-bold text-center text-white mt-2">
+					Claude Draws is no longer accepting new submissions, but you can still explore all the artworks in the gallery.
+				</p>
 			</div>
 		</div>
+
+		<!-- Featured Artwork Section -->
+		{#if featuredArtwork}
+			<div class="max-w-4xl mx-auto mb-8">
+				<div class="bg-kidpix-cyan border-4 border-black p-4 shadow-chunky-lg mb-4">
+					<h2 class="text-2xl font-black uppercase text-center">Latest Artwork</h2>
+				</div>
+				<div class="bg-white border-4 border-black p-4 shadow-chunky-lg">
+					<TabContainer hasVideo={!!featuredArtwork.video_url}>
+						{#snippet children()}
+							<div class="border-4 border-black">
+								<img
+									src={featuredArtwork.image_url}
+									alt={featuredArtwork.title}
+									class="w-full h-auto"
+								/>
+							</div>
+						{/snippet}
+						{#snippet videoContent()}
+							{#if featuredArtwork.video_url}
+								<VideoPlayer videoUrl={featuredArtwork.video_url} />
+							{/if}
+						{/snippet}
+					</TabContainer>
+					<div class="mt-4 text-center">
+						<h3 class="text-xl font-black">{featuredArtwork.title}</h3>
+						<a
+							href="/artwork/{featuredArtwork.id}"
+							class="inline-block mt-3 bg-kidpix-blue text-white font-bold px-4 py-2 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
+						>
+							View Details
+						</a>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Description Section -->
 		<div class="max-w-4xl mx-auto mb-8">
 			<div class="bg-kidpix-yellow border-4 border-black p-6 shadow-chunky-lg">
 				<p class="text-lg sm:text-xl font-bold text-center leading-relaxed">
-					Watch Claude for Chrome create Kid Pix art from your requests.
+					Claude for Chrome created Kid Pix art from crowdsourced requests. Explore the gallery to see what it made!
 				</p>
 			</div>
 		</div>
@@ -74,10 +107,10 @@
 		<!-- Action Buttons -->
 		<div class="flex flex-wrap justify-center gap-4 mb-12">
 			<a
-				href="/submit"
+				href="/gallery"
 				class="bg-kidpix-blue text-white font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
 			>
-				Submit your request
+				Browse Gallery
 			</a>
 			<a
 				href="https://github.com/atbaker/claude-draws"
@@ -86,14 +119,6 @@
 				class="bg-kidpix-orange text-black font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
 			>
 				GitHub
-			</a>
-			<a
-				href="https://www.twitch.tv/claudedraws"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="bg-kidpix-purple text-white font-bold text-lg px-6 py-3 border-4 border-black shadow-chunky hover:shadow-chunky-hover hover:translate-x-1 hover:translate-y-1 uppercase transition-all"
-			>
-				Twitch
 			</a>
 			<a
 				href="/about"
@@ -107,11 +132,6 @@
 			>
 				FAQ
 			</a>
-		</div>
-
-		<!-- Queue Preview Section -->
-		<div class="max-w-4xl mx-auto mb-12">
-			<QueuePreview />
 		</div>
 
 		<!-- Recent Artworks Section -->
@@ -152,7 +172,7 @@
 			</div>
 
 			<div class="max-w-4xl mx-auto space-y-4">
-				<!-- FAQ 1: How do I submit my idea -->
+				<!-- FAQ 1: How submissions worked -->
 				<details class="group bg-kidpix-pink border-4 border-black p-4 shadow-chunky">
 					<summary
 						class="text-lg font-black uppercase cursor-pointer hover:text-black list-none flex items-center gap-2"
@@ -160,17 +180,14 @@
 						<span class="transform transition-transform group-open:rotate-90 text-2xl"
 							>▶</span
 						>
-						How do I submit my idea for Claude Draws to work on?
+						How did submissions work?
 					</summary>
 					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
 						<p>
-							Just head over to the <a href="/submit">submission form</a> and describe your artwork idea in as much detail as you'd like!
+							While Claude Draws was active, visitors could submit artwork ideas through a form on the site. Claude Draws processed the most-upvoted submissions first, and people could upvote each other's ideas in the queue.
 						</p>
 						<p>
-							Claude Draws processes the most-upvoted submissions first. After you submit, you can upvote other submissions in the <a href="/queue">queue</a> - and others can upvote yours too! You can watch Claude Draws work on the livestream at the top of this page. And if you'd like to be notified when your artwork is ready, just include your email address in the form - it's completely optional.
-						</p>
-						<p>
-							So don't worry if the queue is backed up - you don't have to watch the livestream to catch your finished artwork. If you provided an email, you'll get a notification when it's done. Otherwise, you can check back in the gallery to see your completed creation! Plus, each artwork page includes a recording of the entire drawing process, so you can watch Claude work through your design anytime.
+							Submissions are now closed, but you can still explore all the completed artworks in the <a href="/gallery">gallery</a>. Each artwork page includes a recording of the entire drawing process, so you can watch Claude work through each design.
 						</p>
 					</div>
 				</details>
@@ -286,11 +303,11 @@
 						<span class="transform transition-transform group-open:rotate-90 text-2xl"
 							>▶</span
 						>
-						What are those screensavers I see between artworks?
+						What were those screensavers between artworks on the livestream?
 					</summary>
 					<div class="mt-4 text-base font-bold leading-relaxed space-y-4">
 						<p>
-							Those screensavers come from <a href="https://en.wikipedia.org/wiki/After_Dark_(software)">After Dark</a>, classic screen saver software that launched in 1989. If you spent time around computers in the 1990s, you probably remember Flying Toasters, the fish tank, or one of the many other iconic modules that came with After Dark.
+							Those screensavers came from <a href="https://en.wikipedia.org/wiki/After_Dark_(software)">After Dark</a>, classic screen saver software that launched in 1989. If you spent time around computers in the 1990s, you probably remember Flying Toasters, the fish tank, or one of the many other iconic modules that came with After Dark.
 						</p>
 						<p>
 							I pulled a selection of my favorite After Dark screensavers to use with Claude Draws. You can see more in <a href="https://www.youtube.com/watch?v=9nOSe2Sfhfk&list=PLoOqWbDi1JN1MDsYEJdZgQXGFwHkjOiSG">this playlist on YouTube</a>.
