@@ -62,23 +62,20 @@
 		<!-- Featured Artwork Section -->
 		{#if featuredArtwork}
 			<div class="max-w-4xl mx-auto mb-8">
-				<div class="bg-kidpix-cyan border-4 border-black p-4 shadow-chunky-lg mb-4">
-					<h2 class="text-2xl font-black uppercase text-center">Latest Artwork</h2>
-				</div>
 				<div class="bg-white border-4 border-black p-4 shadow-chunky-lg">
-					<TabContainer hasVideo={!!featuredArtwork.video_url}>
+					<TabContainer hasVideo={!!featuredArtwork.videoUrl}>
 						{#snippet children()}
 							<div class="border-4 border-black">
 								<img
-									src={featuredArtwork.image_url}
+									src={featuredArtwork.imageUrl}
 									alt={featuredArtwork.title}
 									class="w-full h-auto"
 								/>
 							</div>
 						{/snippet}
 						{#snippet videoContent()}
-							{#if featuredArtwork.video_url}
-								<VideoPlayer videoUrl={featuredArtwork.video_url} />
+							{#if featuredArtwork.videoUrl}
+								<VideoPlayer videoUrl={featuredArtwork.videoUrl} />
 							{/if}
 						{/snippet}
 					</TabContainer>
